@@ -1,21 +1,189 @@
-# @consilioweb/payload-maintenance
+<!-- Header Banner -->
+<div align="center">
 
-Plugin Payload CMS 3 complet pour ajouter un **mode maintenance** professionnel et customisable a votre site Next.js.
+  <a href="https://git.io/typing-svg">
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fpayload-maintenance;Payload+CMS+Maintenance+Mode;8+Templates+%7C+8+Presets;i18n+10+Languages+%7C+Webhooks;Scheduling+%7C+Newsletter+%7C+503+SEO" alt="Typing SVG" />
+  </a>
 
-## Fonctionnalites
+  <br><br>
 
-- **8 templates** : Minimal, Countdown, Coming Soon, Glassmorphism, Gradient, Split Screen, Video Background, Custom HTML
-- **8 presets pre-configures** : appliquables en 1 clic depuis l'admin
-- **i18n** : 10 langues (FR, EN, DE, ES, IT, PT, NL, JA, AR, ZH) avec auto-detection navigateur
-- **Planification** : activation/desactivation automatique par date
-- **Newsletter** : formulaire d'inscription avec stockage en DB et export CSV
-- **Historique** : log complet des activations/desactivations (qui, quand, duree)
-- **Webhooks** : notifications Slack, Discord, webhook personnalise
-- **SEO** : HTTP 503 + Retry-After header dynamique
-- **Auth bypass** : utilisateurs Payload connectes voient le vrai site automatiquement
-- **Exclusion de routes** : pages specifiques exclues de la maintenance
-- **Design** : Google Fonts, animations Lottie, dark/light/auto mode, custom CSS/HTML
-- **Admin** : dashboard avec toggle, preview live, stats abonnes, presets visuels, historique
+  <!-- Badges -->
+  <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/v/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
+  <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/dw/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
+  <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
+  <img src="https://img.shields.io/badge/Templates-8-8B5CF6?style=for-the-badge" alt="8 Templates">
+  <img src="https://img.shields.io/badge/i18n-10+Languages-F59E0B?style=for-the-badge&logo=translate&logoColor=white" alt="i18n">
+  <a href="https://github.com/pOwn3d/payload-maintenance/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-7C3AED?style=for-the-badge" alt="MIT License"></a>
+  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
+
+</div>
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## About
+
+> **@consilioweb/payload-maintenance** — A complete, production-ready maintenance mode plugin for Payload CMS 3 + Next.js. Includes 8 professional templates, 8 one-click presets, i18n in 10 languages, scheduled maintenance, newsletter subscribers with CSV export, audit history, webhooks (Slack/Discord), HTTP 503 SEO, and a full admin dashboard.
+
+<table>
+  <tr>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/maintenance.png" width="50"/><br>
+      <b>8 Templates</b><br>
+      <sub>Minimal to Glassmorphism</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/language.png" width="50"/><br>
+      <b>10 Languages</b><br>
+      <sub>Auto-detect browser lang</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/calendar--v1.png" width="50"/><br>
+      <b>Scheduling</b><br>
+      <sub>Auto on/off by date</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/webhook.png" width="50"/><br>
+      <b>Webhooks</b><br>
+      <sub>Slack, Discord, Custom</sub>
+    </td>
+  </tr>
+  <tr>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/newsletter.png" width="50"/><br>
+      <b>Newsletter</b><br>
+      <sub>DB storage + CSV export</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/seo-shield.png" width="50"/><br>
+      <b>SEO Ready</b><br>
+      <sub>HTTP 503 + Retry-After</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/paint-palette.png" width="50"/><br>
+      <b>8 Presets</b><br>
+      <sub>One-click apply</sub>
+    </td>
+    <td align="center" width="25%">
+      <img src="https://img.icons8.com/color/96/admin-settings-male.png" width="50"/><br>
+      <b>Admin Dashboard</b><br>
+      <sub>Toggle, preview, stats</sub>
+    </td>
+  </tr>
+</table>
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Templates](#templates)
+- [Presets](#presets)
+- [Plugin Options](#plugin-options)
+- [Middleware Options](#middleware-options)
+- [API Endpoints](#api-endpoints)
+- [Collections](#collections)
+- [Bypass Maintenance](#bypass-maintenance)
+- [Package Exports](#package-exports)
+- [Requirements](#requirements)
+- [License](#license)
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Features
+
+### 8 Professional Templates
+
+| Template | Description |
+|----------|-------------|
+| `minimal` | Clean icon + message layout |
+| `countdown` | SVG circular ring countdown |
+| `coming-soon` | Flip card countdown with separators |
+| `glassmorphism` | Frosted glass card with floating orbs |
+| `gradient` | Multi-color animated gradient background |
+| `split-screen` | Content left, image right (responsive) |
+| `video-background` | MP4 video with overlay |
+| `custom` | Full custom HTML with `{{variables}}` |
+
+### 8 One-Click Presets
+
+Pre-configured templates with colors, fonts, and messages — apply in one click from admin:
+
+| Preset | Template | Style |
+|--------|----------|-------|
+| `corporate-blue` | countdown | Professional dark blue (Inter) |
+| `startup-launch` | gradient | Purple/pink dynamic (Space Grotesk) |
+| `minimal-elegant` | minimal | Clean dark (DM Sans) |
+| `glass-premium` | glassmorphism | Luxurious purple (Outfit) |
+| `coming-soon-creative` | coming-soon | Teal creative (Sora) |
+| `light-clean` | minimal | Light mode (Plus Jakarta Sans) |
+| `warm-gradient` | gradient | Warm orange tones (Poppins) |
+| `tech-dark` | countdown | Cyan tech (JetBrains Mono) |
+
+### Multi-Language (i18n)
+
+- **10 languages** built-in: FR, EN, DE, ES, IT, PT, NL, JA, AR, ZH
+- **Auto-detection** of browser language
+- **Language switcher** on the maintenance page
+- **Per-language messages** configurable from admin
+
+### Scheduled Maintenance
+
+- Set start and end dates
+- Auto-enable and auto-disable toggles
+- Schedule check endpoint for cron integration
+
+### Newsletter Subscribers
+
+- Email signup form on the maintenance page
+- Stored in a dedicated Payload collection
+- Duplicate prevention
+- CSV export endpoint for admin users
+- Tracks language, IP, user-agent
+
+### Audit History
+
+- Logs every activation/deactivation
+- Records who triggered it and when
+- Calculates maintenance duration
+- Viewable in admin dashboard
+
+### Webhooks & Notifications
+
+- **Slack** — formatted message with emoji
+- **Discord** — markdown formatted
+- **Custom webhook** — JSON payload
+- **Email notification** — via Payload email adapter
+- Fires on every toggle
+
+### SEO
+
+- **HTTP 503** status code (configurable)
+- **Retry-After** header (dynamic from estimated end date)
+- `robots: noindex` on maintenance page
+
+### Design Customization
+
+- **Google Fonts** — dynamic loading by name
+- **Lottie animations** — via URL
+- **Dark / Light / Auto** mode (system preference detection)
+- **Custom CSS** and **Custom HTML** support
+- **Background image**, **video**, **split image** uploads
+- **Logo** and **favicon** uploads
+- **Social links** (8 platforms)
+- **Contact email** display
+
+### Admin Dashboard
+
+- Quick toggle on/off from dashboard
+- Live preview iframe
+- Subscriber count with CSV export link
+- Recent history timeline
+- Visual preset gallery with one-click apply
+- Link to full global configuration
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
 ## Installation
 
@@ -23,9 +191,29 @@ Plugin Payload CMS 3 complet pour ajouter un **mode maintenance** professionnel 
 pnpm add @consilioweb/payload-maintenance
 ```
 
-## Configuration
+Or with npm/yarn:
 
-### 1. Plugin Payload
+```bash
+npm install @consilioweb/payload-maintenance
+yarn add @consilioweb/payload-maintenance
+```
+
+### Peer Dependencies
+
+| Package | Version | Required |
+|---------|---------|----------|
+| `payload` | `^3.0.0` | **Yes** |
+| `@payloadcms/next` | `^3.0.0` | Optional (admin views) |
+| `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
+| `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
+| `next` | `^14.0.0 \|\| ^15.0.0` | Optional |
+| `react` | `^18.0.0 \|\| ^19.0.0` | Optional |
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Quick Start
+
+### 1. Add the plugin
 
 ```ts
 // payload.config.ts
@@ -34,7 +222,6 @@ import { maintenancePlugin } from '@consilioweb/payload-maintenance'
 export default buildConfig({
   plugins: [
     maintenancePlugin({
-      // Toutes les options sont optionnelles
       languages: [
         { label: 'Francais', value: 'fr' },
         { label: 'English', value: 'en' },
@@ -44,7 +231,7 @@ export default buildConfig({
 })
 ```
 
-### 2. Middleware Next.js
+### 2. Add the middleware
 
 ```ts
 // src/middleware.ts
@@ -64,7 +251,7 @@ export const config = {
 }
 ```
 
-### 3. Page de maintenance
+### 3. Create the maintenance page
 
 ```tsx
 // src/app/(frontend)/maintenance/page.tsx
@@ -81,124 +268,205 @@ export default function MaintenanceRoute() {
 }
 ```
 
-### 4. Regenerer l'importmap
+### 4. Regenerate importmap
 
 ```bash
 pnpm generate:importmap
 ```
 
-## Options du plugin
+That's it! The plugin automatically adds:
+- A **Maintenance** global in Settings
+- **2 collections** (subscribers + history)
+- **9 API endpoints**
+- An admin **dashboard view** at `/admin/maintenance`
+- A **toggle widget** on the admin dashboard
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Plugin Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `globalSlug` | `string` | `'maintenance'` | Slug du global Payload |
-| `endpointBasePath` | `string` | `'/maintenance'` | Chemin de base des endpoints API |
-| `languages` | `{label, value}[]` | `[{fr}, {en}]` | Langues disponibles |
-| `excludedPaths` | `string[]` | `['/admin', '/api']` | Chemins jamais bloques |
-| `addDashboardView` | `boolean` | `true` | Vue admin dashboard |
-| `mediaCollectionSlug` | `string` | `'media'` | Collection pour les uploads |
-| `enableSubscribers` | `boolean` | `true` | Collection subscribers en DB |
-| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Slug collection subscribers |
-| `enableHistory` | `boolean` | `true` | Collection historique |
-| `historySlug` | `string` | `'maintenance-history'` | Slug collection historique |
-| `enableScheduling` | `boolean` | `true` | Planification automatique |
-| `authBypass` | `boolean` | `true` | Bypass pour users connectes |
-| `bypassCookieName` | `string` | `'maintenance-bypass'` | Nom du cookie bypass |
+| `globalSlug` | `string` | `'maintenance'` | Global config slug |
+| `endpointBasePath` | `string` | `'/maintenance'` | API endpoint prefix |
+| `languages` | `{label, value}[]` | `[{fr}, {en}]` | Available languages |
+| `excludedPaths` | `string[]` | `['/admin', '/api']` | Never-blocked paths |
+| `addDashboardView` | `boolean` | `true` | Add admin view |
+| `mediaCollectionSlug` | `string` | `'media'` | Upload collection |
+| `enableSubscribers` | `boolean` | `true` | Subscribers collection |
+| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Subscribers slug |
+| `enableHistory` | `boolean` | `true` | History collection |
+| `historySlug` | `string` | `'maintenance-history'` | History slug |
+| `enableScheduling` | `boolean` | `true` | Schedule fields |
+| `authBypass` | `boolean` | `true` | Bypass for logged-in users |
+| `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie name |
 
-## Options du middleware
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Middleware Options
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `excludedPaths` | `string[]` | `['/admin', '/api']` | Chemins jamais bloques |
-| `cacheDuration` | `number` | `10` | Cache en secondes |
-| `return503` | `boolean` | `true` | HTTP 503 pour le SEO |
-| `authBypass` | `boolean` | `true` | Bypass users connectes |
-| `authCookieName` | `string` | `'payload-token'` | Cookie auth Payload |
-| `bypassCookieName` | `string` | `'maintenance-bypass'` | Cookie bypass |
+| `excludedPaths` | `string[]` | `['/admin', '/api']` | Never-blocked paths |
+| `cacheDuration` | `number` | `10` | Status cache (seconds) |
+| `return503` | `boolean` | `true` | HTTP 503 for SEO |
+| `authBypass` | `boolean` | `true` | Logged-in users bypass |
+| `authCookieName` | `string` | `'payload-token'` | Payload auth cookie |
+| `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie |
+| `apiUrl` | `string` | Same origin | Custom API URL |
 
-## Endpoints API
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-| Endpoint | Methode | Auth | Description |
-|----------|---------|------|-------------|
-| `/api/maintenance/status` | GET | Public | Status complet |
-| `/api/maintenance/toggle` | POST | Admin | Basculer on/off |
-| `/api/maintenance/newsletter` | POST | Public | Inscription email |
-| `/api/maintenance/stats` | GET | Admin | Stats + historique |
-| `/api/maintenance/subscribers/export` | GET | Admin | Export CSV abonnes |
-| `/api/maintenance/presets` | GET | Public | Liste des presets |
-| `/api/maintenance/presets/apply` | POST | Admin | Appliquer un preset |
-| `/api/maintenance/schedule-check` | GET | Public | Verifier planification |
+## API Endpoints
 
-## Templates
+| Method | Path | Auth | Description |
+|--------|------|------|-------------|
+| `GET` | `/api/maintenance/status` | Public | Full maintenance status |
+| `POST` | `/api/maintenance/toggle` | Admin | Toggle on/off |
+| `POST` | `/api/maintenance/newsletter` | Public | Newsletter signup |
+| `GET` | `/api/maintenance/stats` | Admin | Subscribers count + history |
+| `GET` | `/api/maintenance/subscribers/export` | Admin | CSV export |
+| `GET` | `/api/maintenance/presets` | Public | List available presets |
+| `POST` | `/api/maintenance/presets/apply` | Admin | Apply a preset |
+| `GET` | `/api/maintenance/schedule-check` | Public | Check scheduled dates |
 
-| Template | Description |
-|----------|-------------|
-| `minimal` | Sobre avec icone animee |
-| `countdown` | Anneaux SVG circulaires |
-| `coming-soon` | Flip cards avec separateurs |
-| `glassmorphism` | Carte verre depoli, orbes flottants |
-| `gradient` | Gradient anime multi-couleurs |
-| `split-screen` | Contenu gauche, image droite (responsive) |
-| `video-background` | Video MP4 en fond avec overlay |
-| `custom` | HTML libre avec variables `{{title}}`, `{{description}}`, `{{estimatedEnd}}`, `{{logoUrl}}` |
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-## Presets
+## Collections
 
-8 presets pre-configures appliquables en 1 clic :
+The plugin automatically creates two collections:
 
-| Preset | Template | Style |
-|--------|----------|-------|
-| `corporate-blue` | countdown | Professionnel bleu fonce |
-| `startup-launch` | gradient | Violet/rose dynamique |
-| `minimal-elegant` | minimal | Noir sobre |
-| `glass-premium` | glassmorphism | Violet luxueux |
-| `coming-soon-creative` | coming-soon | Teal creatif |
-| `light-clean` | minimal | Mode clair epure |
-| `warm-gradient` | gradient | Tons chauds orange |
-| `tech-dark` | countdown | Cyan technique |
+### `maintenance-subscribers`
 
-```bash
-# Via API
-curl -X POST /api/maintenance/presets/apply \
-  -H 'Content-Type: application/json' \
-  -d '{"presetId": "glass-premium"}'
+| Field | Type | Description |
+|-------|------|-------------|
+| `email` | email (unique) | Subscriber email |
+| `language` | text | Browser language |
+| `subscribedAt` | date | Registration date |
+| `ip` | text | IP address |
+| `userAgent` | text | Browser user agent |
+
+### `maintenance-history`
+
+| Field | Type | Description |
+|-------|------|-------------|
+| `action` | select | activated / deactivated / scheduled-start / scheduled-end |
+| `triggeredBy` | text | User email or "system" |
+| `timestamp` | date | When it happened |
+| `duration` | text | Maintenance duration (on deactivation) |
+| `details` | json | Template, message count, etc. |
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Bypass Maintenance
+
+Multiple ways to bypass the maintenance page:
+
+| Method | How |
+|--------|-----|
+| **Bypass cookie** | Visit `?bypass=YOUR_SECRET` — sets a 24h cookie |
+| **IP whitelist** | Configure allowed IPs in admin (Access tab) |
+| **Auth bypass** | Logged-in Payload admin users automatically see the real site |
+| **Route exclusion** | Exclude specific routes (e.g. `/pricing`, `/legal/*`) in admin |
+| **Path exclusion** | `/admin` and `/api` are always accessible |
+
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## Package Exports
+
+```ts
+// Server — plugin, types, globals, endpoints, collections, presets
+import {
+  maintenancePlugin,
+  createMaintenanceGlobal,
+  createSubscribersCollection,
+  createHistoryCollection,
+  presets,
+  getPreset,
+  presetToPayloadData,
+} from '@consilioweb/payload-maintenance'
+
+import type {
+  MaintenancePluginConfig,
+  MaintenanceMessage,
+  MaintenanceStatus,
+  MaintenanceTemplate,
+  SocialLink,
+  WebhookConfig,
+  MaintenancePreset,
+} from '@consilioweb/payload-maintenance'
+
+// Client — React components
+import {
+  MaintenancePage,
+  MaintenanceToggle,
+  MaintenanceViewClient,
+} from '@consilioweb/payload-maintenance/client'
+
+// Views — server components for admin
+import { MaintenanceView } from '@consilioweb/payload-maintenance/views'
+
+// Middleware — Next.js middleware helper
+import { createMaintenanceMiddleware } from '@consilioweb/payload-maintenance/middleware'
+import type { MaintenanceMiddlewareConfig } from '@consilioweb/payload-maintenance/middleware'
 ```
 
-## Collections creees
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-Le plugin cree automatiquement 2 collections :
+## Requirements
 
-- **maintenance-subscribers** : emails newsletter (email, langue, date, IP, user-agent)
-- **maintenance-history** : log des activations (action, par qui, quand, duree, details)
+- **Node.js** >= 18
+- **Payload CMS** 3.x
+- **Next.js** 14.x or 15.x
+- **React** 18.x or 19.x
+- **Database**: Any Payload-supported adapter (SQLite, PostgreSQL, MongoDB)
 
-## Bypass maintenance
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-- **Cookie** : `?bypass=VOTRE_SECRET` dans l'URL (cookie 24h)
-- **IP whitelist** : configurable dans l'admin, onglet Acces
-- **Auth** : les utilisateurs Payload connectes passent automatiquement
-- **Routes** : exclure des routes specifiques (ex: `/pricing`, `/legal/*`)
+## Uninstall
 
-## Architecture
+1. Remove the plugin from `payload.config.ts`
+2. Remove the middleware from `src/middleware.ts`
+3. Remove the maintenance page from `src/app/(frontend)/maintenance/`
+4. Uninstall: `pnpm remove @consilioweb/payload-maintenance`
+5. Regenerate importmap: `pnpm generate:importmap`
 
+### Data cleanup (optional)
+
+The plugin collections remain in your database. To remove them:
+
+**SQLite:**
+```sql
+DROP TABLE IF EXISTS "maintenance-subscribers";
+DROP TABLE IF EXISTS "maintenance-history";
 ```
-@consilioweb/payload-maintenance
-  /           -> Plugin, types, globals, endpoints, collections, presets (server)
-  /client     -> MaintenancePage, MaintenanceToggle, MaintenanceDashboard (React)
-  /views      -> MaintenanceView (server component, DefaultTemplate)
-  /middleware  -> createMaintenanceMiddleware (Next.js middleware)
-```
 
-## Compatibilite
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-- Payload CMS 3.x
-- Next.js 14/15
-- React 18/19
-- SQLite / PostgreSQL / tout adapter Payload
+## License
 
-## Licence
+[MIT](LICENSE)
 
-MIT
+<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
-## Auteur
+<div align="center">
 
-[ConsilioWEB](https://consilioweb.fr)
+### Author
+
+**Made with passion by [ConsilioWEB](https://consilioweb.fr)**
+
+<a href="https://www.linkedin.com/in/christophe-lopez/">
+  <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
+</a>
+<a href="https://github.com/pOwn3d">
+  <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
+</a>
+<a href="https://consilioweb.fr">
+  <img src="https://img.shields.io/badge/Website-consilioweb.fr-3B82F6?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website">
+</a>
+
+<br><br>
+
+<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer" width="100%"/>
+
+</div>
