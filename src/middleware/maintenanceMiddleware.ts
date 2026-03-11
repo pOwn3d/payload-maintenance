@@ -80,8 +80,25 @@ async function fetchMaintenanceStatus(
   }
 }
 
+/**
+ * Get current time in a given IANA timezone for comparison.
+ * Returns a Date-like timestamp adjusted so that simple comparisons
+ * with schedule dates (stored as local times) work correctly.
+ */
+function getNowInTimezone(timezone: string | null | undefined): Date {
+  if (!timezone) return new Date()
+  try {
+    // Format current UTC time in the target timezone, then parse it back
+    const nowStr = new Date().toLocaleString('en-US', { timeZone: timezone })
+    return new Date(nowStr)
+  } catch {
+    // Invalid timezone — fall back to UTC
+    return new Date()
+  }
+}
+
 function checkSchedule(data: any): boolean | null {
-  const now = new Date()
+  const now = getNowInTimezone(data.timezone)
 
   if (data.scheduledStart && data.autoEnable && !data.enabled) {
     const start = new Date(data.scheduledStart)

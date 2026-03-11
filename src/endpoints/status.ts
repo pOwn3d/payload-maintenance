@@ -67,6 +67,7 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
         // Scheduling
         scheduledStart: maintenance.scheduledStart || null,
         scheduledEnd: maintenance.scheduledEnd || null,
+        timezone: maintenance.timezone || null,
       })
     } catch (error) {
       return Response.json({
@@ -188,7 +189,7 @@ export function createSubscribersExportHandler(
         sort: '-subscribedAt',
       })
 
-      const csvHeader = 'email,language,subscribedAt,ip\n'
+      const csvHeader = '\uFEFFemail,language,subscribedAt,ip\n'
       const csvRows = subscribers.docs
         .map((s: any) => `${s.email},${s.language || ''},${s.subscribedAt || ''},${s.ip || ''}`)
         .join('\n')

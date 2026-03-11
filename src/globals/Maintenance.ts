@@ -498,6 +498,18 @@ export function createMaintenanceGlobal(
                       ],
                     },
                     {
+                      name: 'timezone',
+                      type: 'text' as const,
+                      label: { en: 'Timezone', fr: 'Fuseau horaire' },
+                      admin: {
+                        placeholder: 'Europe/Paris',
+                        description: {
+                          en: 'IANA timezone for scheduled dates (e.g. Europe/Paris, America/New_York). Leave empty for UTC.',
+                          fr: 'Fuseau horaire IANA pour les dates planifiees (ex. Europe/Paris, America/New_York). Laisser vide pour UTC.',
+                        },
+                      },
+                    },
+                    {
                       type: 'row' as const,
                       fields: [
                         {
@@ -557,6 +569,18 @@ export function createMaintenanceGlobal(
                         type: 'text',
                         label: { en: 'Webhook URL', fr: 'URL du webhook' },
                         required: true,
+                        validate: (value: string | null | undefined) => {
+                          if (!value) return true
+                          try {
+                            const parsed = new URL(value)
+                            if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+                              return 'URL must start with https:// or http://'
+                            }
+                            return true
+                          } catch {
+                            return 'Invalid URL format'
+                          }
+                        },
                         admin: { width: '50%' },
                       },
                       {
@@ -663,14 +687,32 @@ async function fireWebhook(
     body = JSON.stringify({ action, triggeredBy, timestamp })
   }
 
+  // Validate URL before fetching
+  try {
+    const parsed = new URL(webhook.url)
+    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
+      logger.error(`[maintenance] Webhook URL must use http(s): ${webhook.url}`)
+      return
+    }
+  } catch {
+    logger.error(`[maintenance] Invalid webhook URL: ${webhook.url}`)
+    return
+  }
+
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 5000)
+
   try {
     await fetch(webhook.url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body,
+      signal: controller.signal,
     })
     logger.info(`[maintenance] Webhook fired: ${webhook.type} → ${action}`)
   } catch (e) {
     logger.error(`[maintenance] Webhook error: ${e}`)
+  } finally {
+    clearTimeout(timeout)
   }
 }

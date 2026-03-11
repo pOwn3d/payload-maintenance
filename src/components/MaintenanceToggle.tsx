@@ -2,6 +2,32 @@
 
 import React, { useCallback, useEffect, useState } from 'react'
 
+// ─── i18n ───
+const toggleTranslations: Record<string, Record<string, string>> = {
+  fr: {
+    maintenanceActive: 'Maintenance active',
+    siteOnline: 'Site en ligne',
+    disable: 'Desactiver',
+    enable: 'Activer',
+  },
+  en: {
+    maintenanceActive: 'Maintenance active',
+    siteOnline: 'Site online',
+    disable: 'Disable',
+    enable: 'Enable',
+  },
+}
+
+function useToggleLang(): string {
+  if (typeof navigator === 'undefined') return 'fr'
+  const lang = navigator.language.split('-')[0]
+  return lang in toggleTranslations ? lang : 'en'
+}
+
+function tt(lang: string, key: string): string {
+  return toggleTranslations[lang]?.[key] || toggleTranslations.en?.[key] || key
+}
+
 interface MaintenanceToggleProps {
   /** Base API path (default: '/api/maintenance') */
   basePath?: string
@@ -12,6 +38,7 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
 }) => {
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [loading, setLoading] = useState(false)
+  const lang = useToggleLang()
 
   useEffect(() => {
     fetch(`${basePath}/status`)
@@ -58,7 +85,7 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
         }}
       />
       <span style={{ fontSize: '0.875rem', fontWeight: 500 }}>
-        {enabled ? 'Maintenance active' : 'Site en ligne'}
+        {enabled ? tt(lang, 'maintenanceActive') : tt(lang, 'siteOnline')}
       </span>
       <button
         onClick={toggle}
@@ -77,7 +104,7 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
           transition: 'opacity 0.2s',
         }}
       >
-        {loading ? '...' : enabled ? 'Desactiver' : 'Activer'}
+        {loading ? '...' : enabled ? tt(lang, 'disable') : tt(lang, 'enable')}
       </button>
       <style>{`
         @keyframes blink {

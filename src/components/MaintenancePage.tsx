@@ -152,6 +152,30 @@ function t(lang: string, key: string): string {
 
 // ─── Helpers ───
 
+/**
+ * Simple inline HTML sanitizer — strips dangerous tags and attributes.
+ * No external dependencies needed (runs client-side in standalone maintenance page).
+ */
+function sanitizeHTML(html: string): string {
+  // Remove dangerous tags and their content
+  let clean = html.replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
+  clean = clean.replace(/<\s*iframe\b[^>]*>[\s\S]*?<\s*\/\s*iframe\s*>/gi, '')
+  clean = clean.replace(/<\s*object\b[^>]*>[\s\S]*?<\s*\/\s*object\s*>/gi, '')
+  clean = clean.replace(/<\s*embed\b[^>]*\/?>/gi, '')
+  clean = clean.replace(/<\s*form\b[^>]*>[\s\S]*?<\s*\/\s*form\s*>/gi, '')
+  // Remove self-closing / orphan variants
+  clean = clean.replace(/<\s*script\b[^>]*\/?>/gi, '')
+  clean = clean.replace(/<\s*iframe\b[^>]*\/?>/gi, '')
+  clean = clean.replace(/<\s*object\b[^>]*\/?>/gi, '')
+  // Remove on* event handlers (onclick, onerror, onload, etc.)
+  clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
+  // Remove javascript: URLs
+  clean = clean.replace(/href\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'href="#"')
+  clean = clean.replace(/src\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'src=""')
+  clean = clean.replace(/action\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'action=""')
+  return clean
+}
+
 function detectLanguage(messages: MaintenanceMessage[]): string {
   if (typeof navigator === 'undefined') return messages[0]?.language || 'fr'
   const browserLang = navigator.language.split('-')[0]
@@ -810,11 +834,13 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({
 
   // Custom HTML template
   if (data.template === 'custom' && data.customHTML) {
-    const html = data.customHTML
-      .replace(/\{\{title\}\}/g, message?.title || '')
-      .replace(/\{\{description\}\}/g, message?.description || '')
-      .replace(/\{\{estimatedEnd\}\}/g, data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : '')
-      .replace(/\{\{logoUrl\}\}/g, data.logoUrl || '')
+    const html = sanitizeHTML(
+      data.customHTML
+        .replace(/\{\{title\}\}/g, message?.title || '')
+        .replace(/\{\{description\}\}/g, message?.description || '')
+        .replace(/\{\{estimatedEnd\}\}/g, data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : '')
+        .replace(/\{\{logoUrl\}\}/g, data.logoUrl || ''),
+    )
     return (
       <>
         <div dangerouslySetInnerHTML={{ __html: html }} />
