@@ -30,6 +30,7 @@ export function createHistoryCollection(slug: string = 'maintenance-history'): C
           { label: { en: 'Scheduled start', fr: 'Debut planifie' }, value: 'scheduled-start' },
           { label: { en: 'Scheduled end', fr: 'Fin planifiee' }, value: 'scheduled-end' },
           { label: { en: 'Config updated', fr: 'Config modifiee' }, value: 'config-updated' },
+          { label: { en: 'Webhook failed', fr: 'Webhook echoue' }, value: 'webhook-failed' },
         ],
       },
       {

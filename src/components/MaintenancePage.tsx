@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useCallback, useMemo } from 'react'
+import React, { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 
 // ─── Types ───
 
@@ -21,6 +21,7 @@ interface SocialLink {
 interface MaintenanceData {
   enabled: boolean
   template: string
+  maintenanceType?: 'maintenance' | 'coming-soon' | 'upgrade' | 'emergency'
   messages: MaintenanceMessage[]
   estimatedEnd?: string | null
   logoUrl?: string | null
@@ -489,6 +490,14 @@ function LottiePlayer({ url }: { url: string }) {
 
 // ─── Content Block (shared across templates) ───
 
+// Maintenance type emoji mapping
+const maintenanceTypeEmojis: Record<string, string> = {
+  'maintenance': '\uD83D\uDD27',
+  'coming-soon': '\uD83D\uDE80',
+  'upgrade': '\u2B06\uFE0F',
+  'emergency': '\uD83D\uDEA8',
+}
+
 function ContentBlock({ data, message, countdown, currentLang, accent, textColor, apiBase, glass }: {
   data: MaintenanceData; message: MaintenanceMessage | undefined
   countdown: ReturnType<typeof useCountdown>
@@ -500,6 +509,13 @@ function ContentBlock({ data, message, countdown, currentLang, accent, textColor
 
   return (
     <>
+      {/* Maintenance type icon */}
+      {data.maintenanceType && (
+        <div style={{ fontSize: '2.5rem', marginBottom: '0.75rem' }} role="img" aria-label={data.maintenanceType}>
+          {maintenanceTypeEmojis[data.maintenanceType] || maintenanceTypeEmojis['maintenance']}
+        </div>
+      )}
+
       {/* Lottie */}
       {data.lottieUrl && <LottiePlayer url={data.lottieUrl} />}
 
@@ -798,6 +814,7 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({
 }) => {
   const [data, setData] = useState<MaintenanceData | null>(null)
   const [currentLang, setCurrentLang] = useState<string>(forceLang || 'fr')
+  const trackedRef = useRef(false)
 
   useEffect(() => {
     fetch(statusEndpoint)
@@ -813,6 +830,18 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({
         })
       })
   }, [statusEndpoint, forceLang])
+
+  // Track page view once per page load
+  useEffect(() => {
+    if (trackedRef.current) return
+    trackedRef.current = true
+    const trackBase = statusEndpoint.replace('/status', '')
+    fetch(`${trackBase}/track`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ path: typeof window !== 'undefined' ? window.location.pathname : '/' }),
+    }).catch(() => {})
+  }, [statusEndpoint])
 
   const isDark = useColorMode(data?.darkMode || 'dark')
   const countdown = useCountdown(data?.estimatedEnd)

@@ -22,6 +22,8 @@ import type { MaintenancePluginConfig } from './types.js'
 import { createMaintenanceGlobal } from './globals/Maintenance.js'
 import { createSubscribersCollection } from './collections/MaintenanceSubscribers.js'
 import { createHistoryCollection } from './collections/MaintenanceHistory.js'
+import { createAnalyticsCollection } from './collections/MaintenanceAnalytics.js'
+import { createWebhookLogsCollection } from './collections/WebhookLogs.js'
 import {
   createStatusHandler,
   createToggleHandler,
@@ -29,7 +31,11 @@ import {
   createSubscribersExportHandler,
   createStatsHandler,
   createScheduleCheckHandler,
+  createTrackViewHandler,
+  createAnalyticsHandler,
+  createUnsubscribeHandler,
 } from './endpoints/status.js'
+import { createMaintenancePageHandler } from './endpoints/page.js'
 import { createPresetsListHandler, createApplyPresetHandler } from './endpoints/presets.js'
 import { translations } from './translations/index.js'
 
@@ -45,6 +51,9 @@ export const maintenancePlugin =
     const enableHistory = pluginConfig.enableHistory !== false
     const historySlug = pluginConfig.historySlug ?? 'maintenance-history'
     const enableScheduling = pluginConfig.enableScheduling !== false
+    const enableAnalytics = pluginConfig.enableAnalytics !== false
+    const analyticsSlug = pluginConfig.analyticsSlug ?? 'maintenance-analytics'
+    const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
 
     // 1. Merge i18n translations
     config.i18n = {
@@ -75,6 +84,19 @@ export const maintenancePlugin =
       ]
     }
 
+    if (enableAnalytics) {
+      config.collections = [
+        ...config.collections,
+        createAnalyticsCollection(analyticsSlug),
+      ]
+    }
+
+    // Always add webhook logs collection
+    config.collections = [
+      ...config.collections,
+      createWebhookLogsCollection(webhookLogsSlug),
+    ]
+
     // 4. Add API endpoints
     config.endpoints = [
       ...(config.endpoints || []),
@@ -101,11 +123,33 @@ export const maintenancePlugin =
     ]
 
     if (enableSubscribers) {
-      config.endpoints.push({
-        path: `${basePath}/subscribers/export`,
-        method: 'get' as const,
-        handler: createSubscribersExportHandler(subscribersSlug),
-      })
+      config.endpoints.push(
+        {
+          path: `${basePath}/subscribers/export`,
+          method: 'get' as const,
+          handler: createSubscribersExportHandler(subscribersSlug),
+        },
+        {
+          path: `${basePath}/unsubscribe`,
+          method: 'get' as const,
+          handler: createUnsubscribeHandler(subscribersSlug),
+        },
+      )
+    }
+
+    if (enableAnalytics) {
+      config.endpoints.push(
+        {
+          path: `${basePath}/track`,
+          method: 'post' as const,
+          handler: createTrackViewHandler(analyticsSlug),
+        },
+        {
+          path: `${basePath}/analytics`,
+          method: 'get' as const,
+          handler: createAnalyticsHandler(analyticsSlug),
+        },
+      )
     }
 
     if (enableScheduling) {
@@ -115,6 +159,13 @@ export const maintenancePlugin =
         handler: createScheduleCheckHandler(globalSlug),
       })
     }
+
+    // Standalone HTML maintenance page
+    config.endpoints.push({
+      path: `${basePath}/page`,
+      method: 'get' as const,
+      handler: createMaintenancePageHandler(basePath),
+    })
 
     // Presets endpoints
     config.endpoints.push(

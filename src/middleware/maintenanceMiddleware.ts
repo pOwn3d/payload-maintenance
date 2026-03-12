@@ -16,6 +16,9 @@ export interface MaintenanceMiddlewareConfig {
   /** Endpoint path to check maintenance status (default: '/api/maintenance/status') */
   statusEndpoint?: string
 
+  /** Path to the standalone HTML maintenance page endpoint (default: '/api/maintenance/page') */
+  maintenancePagePath?: string
+
   /** Enable auth bypass — logged-in users see real site (default: true) */
   authBypass?: boolean
 
@@ -129,6 +132,7 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
   const cacheDuration = config.cacheDuration ?? 10
   const bypassCookieName = config.bypassCookieName ?? 'maintenance-bypass'
   const statusEndpoint = config.statusEndpoint ?? '/api/maintenance/status'
+  const maintenancePagePath = config.maintenancePagePath ?? '/api/maintenance/page'
   const enableAuthBypass = config.authBypass !== false
   const authCookieName = config.authCookieName ?? 'payload-token'
   const return503 = config.return503 !== false
@@ -150,8 +154,8 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
       return null
     }
 
-    // Never block the maintenance page itself
-    if (pathname === '/maintenance') {
+    // Never block the maintenance page endpoint itself
+    if (pathname === '/maintenance' || pathname === maintenancePagePath) {
       return null
     }
 
@@ -205,23 +209,38 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
       if (isExcluded) return null
     }
 
-    // Show maintenance page with proper SEO status
-    const maintenanceUrl = new URL('/maintenance', request.nextUrl.origin)
-    maintenanceUrl.searchParams.set('from', pathname)
+    // Fetch the standalone HTML maintenance page from the endpoint
+    try {
+      const pageUrl = `${origin}${maintenancePagePath}`
+      const pageRes = await fetch(pageUrl, { cache: 'no-store' } as RequestInit)
+      const html = await pageRes.text()
 
-    const response = NextResponse.rewrite(maintenanceUrl, {
-      status: return503 ? 503 : undefined,
-    })
+      const response = new NextResponse(html, {
+        status: return503 ? 503 : 200,
+        headers: {
+          'Content-Type': 'text/html; charset=utf-8',
+          'Cache-Control': 'no-store, no-cache, must-revalidate',
+          'X-Robots-Tag': 'noindex',
+        },
+      })
 
-    // SEO: Retry-After header
-    if (status.estimatedEnd) {
-      const end = new Date(status.estimatedEnd)
-      const seconds = Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000))
-      response.headers.set('Retry-After', String(seconds))
-    } else {
-      response.headers.set('Retry-After', '3600')
+      // SEO: Retry-After header
+      if (status.estimatedEnd) {
+        const end = new Date(status.estimatedEnd)
+        const seconds = Math.max(0, Math.floor((end.getTime() - Date.now()) / 1000))
+        response.headers.set('Retry-After', String(seconds))
+      } else {
+        response.headers.set('Retry-After', '3600')
+      }
+
+      return response
+    } catch {
+      // Fallback: rewrite to /maintenance if the page endpoint fails
+      const maintenanceUrl = new URL('/maintenance', request.nextUrl.origin)
+      maintenanceUrl.searchParams.set('from', pathname)
+      return NextResponse.rewrite(maintenanceUrl, {
+        status: return503 ? 503 : undefined,
+      })
     }
-
-    return response
   }
 }

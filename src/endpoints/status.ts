@@ -1,9 +1,20 @@
 import type { PayloadHandler } from 'payload'
+import crypto from 'crypto'
+import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 
 function resolveMediaUrl(media: any): string | null {
   if (!media) return null
   if (typeof media === 'string') return media
   return media.url || media.filename ? `/${media.filename}` : null
+}
+
+/** Extract client IP from request headers */
+function getClientIP(req: any): string {
+  return (
+    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    req.headers.get('x-real-ip') ||
+    'unknown'
+  )
 }
 
 /**
@@ -12,6 +23,11 @@ function resolveMediaUrl(media: any): string | null {
  */
 export function createStatusHandler(globalSlug: string): PayloadHandler {
   return async (req) => {
+    // Rate limit: 60 requests per minute per IP
+    const ip = getClientIP(req)
+    const { allowed, retryAfter } = rateLimit(`status:${ip}`, 60, 60_000)
+    if (!allowed) return rateLimitResponse(retryAfter)
+
     try {
       const maintenance = await req.payload.findGlobal({
         slug: globalSlug,
@@ -34,6 +50,7 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
       return Response.json({
         enabled: Boolean(maintenance.enabled),
         template: maintenance.template || 'minimal',
+        maintenanceType: maintenance.maintenanceType || 'maintenance',
         messages: maintenance.messages || [],
         estimatedEnd: maintenance.estimatedEnd || null,
         allowedIPs,
@@ -118,6 +135,7 @@ export function createToggleHandler(globalSlug: string): PayloadHandler {
 
 /**
  * Newsletter signup handler — stores email in subscribers collection.
+ * Requires GDPR consent field in request body.
  */
 export function createNewsletterHandler(
   globalSlug: string,
@@ -125,13 +143,26 @@ export function createNewsletterHandler(
   enableSubscribers: boolean = true,
 ): PayloadHandler {
   return async (req) => {
+    // Rate limit: 5 requests per minute per IP
+    const ip = getClientIP(req)
+    const { allowed, retryAfter } = rateLimit(`newsletter:${ip}`, 5, 60_000)
+    if (!allowed) return rateLimitResponse(retryAfter)
+
     try {
-      const body = await req.json?.() as { email?: string; language?: string } | undefined
+      const body = await req.json?.() as { email?: string; language?: string; consent?: boolean } | undefined
       const email = body?.email
       const language = body?.language
+      const consent = body?.consent
 
-      if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-        return Response.json({ error: 'Invalid email' }, { status: 400 })
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+      if (!email || !emailRegex.test(email)) {
+        return Response.json({ error: 'Invalid email format' }, { status: 400 })
+      }
+
+      // GDPR consent is required
+      if (!consent) {
+        return Response.json({ error: 'Consent is required' }, { status: 400 })
       }
 
       if (enableSubscribers) {
@@ -146,11 +177,6 @@ export function createNewsletterHandler(
           return Response.json({ success: true, message: 'Already registered' })
         }
 
-        const ip =
-          req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-          req.headers.get('x-real-ip') ||
-          ''
-
         await req.payload.create({
           collection: subscribersSlug as any,
           data: {
@@ -159,6 +185,9 @@ export function createNewsletterHandler(
             subscribedAt: new Date().toISOString(),
             ip,
             userAgent: req.headers.get('user-agent') || '',
+            consentAt: new Date().toISOString(),
+            consentSource: 'maintenance-page',
+            unsubscribeToken: crypto.randomUUID(),
           },
         })
       }
@@ -248,11 +277,122 @@ export function createStatsHandler(
 }
 
 /**
- * Check scheduled maintenance and auto-toggle if needed.
+ * Track a page view during maintenance mode (public, fire-and-forget).
+ */
+export function createTrackViewHandler(analyticsSlug: string = 'maintenance-analytics'): PayloadHandler {
+  return async (req) => {
+    // Rate limit: 30 requests per minute per IP
+    const ip = getClientIP(req)
+    const { allowed, retryAfter } = rateLimit(`track:${ip}`, 30, 60_000)
+    if (!allowed) return rateLimitResponse(retryAfter)
+
+    try {
+      const body = await req.json?.() as { path?: string } | undefined
+      const path = body?.path || '/'
+
+      const userAgent = req.headers.get('user-agent') || ''
+      const referer = req.headers.get('referer') || ''
+
+      // Fire-and-forget insert — don't await
+      req.payload.create({
+        collection: analyticsSlug as any,
+        data: {
+          path,
+          ip,
+          userAgent,
+          referer,
+          timestamp: new Date().toISOString(),
+        },
+      }).catch(() => {})
+
+      return Response.json({ tracked: true })
+    } catch {
+      return Response.json({ tracked: false })
+    }
+  }
+}
+
+/**
+ * Get analytics stats for maintenance page views (admin only).
+ */
+export function createAnalyticsHandler(analyticsSlug: string = 'maintenance-analytics'): PayloadHandler {
+  return async (req) => {
+    if (!req.user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    try {
+      // Fetch all views
+      const allViews = await req.payload.find({
+        collection: analyticsSlug as any,
+        limit: 10000,
+        sort: '-timestamp',
+      })
+
+      const docs = allViews.docs as any[]
+      const totalViews = allViews.totalDocs
+
+      // Unique IPs
+      const uniqueIPs = new Set(docs.map((d) => d.ip).filter(Boolean)).size
+
+      // Top paths
+      const pathCounts: Record<string, number> = {}
+      for (const doc of docs) {
+        const p = doc.path || '/'
+        pathCounts[p] = (pathCounts[p] || 0) + 1
+      }
+      const topPaths = Object.entries(pathCounts)
+        .map(([path, count]) => ({ path, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+
+      // Views by hour (last 24h)
+      const now = Date.now()
+      const last24h = docs.filter((d) => d.timestamp && (now - new Date(d.timestamp).getTime()) < 86400000)
+      const hourCounts: Record<string, number> = {}
+      for (const doc of last24h) {
+        const hour = new Date(doc.timestamp).toISOString().slice(0, 13) + ':00'
+        hourCounts[hour] = (hourCounts[hour] || 0) + 1
+      }
+      const viewsByHour = Object.entries(hourCounts)
+        .map(([hour, count]) => ({ hour, count }))
+        .sort((a, b) => a.hour.localeCompare(b.hour))
+
+      // Top referers
+      const refererCounts: Record<string, number> = {}
+      for (const doc of docs) {
+        const ref = doc.referer || ''
+        if (!ref) continue
+        refererCounts[ref] = (refererCounts[ref] || 0) + 1
+      }
+      const topReferers = Object.entries(refererCounts)
+        .map(([referer, count]) => ({ referer, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 10)
+
+      return Response.json({
+        totalViews,
+        uniqueIPs,
+        topPaths,
+        viewsByHour,
+        topReferers,
+      })
+    } catch (error) {
+      return Response.json({ error: 'Failed to fetch analytics' }, { status: 500 })
+    }
+  }
+}
+
+/**
+ * Check scheduled maintenance and auto-toggle if needed (admin only).
  * Called by middleware or cron.
  */
 export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
   return async (req) => {
+    if (!req.user) {
+      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     try {
       const maintenance = await req.payload.findGlobal({
         slug: globalSlug,
@@ -305,5 +445,37 @@ export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
     } catch (error) {
       return Response.json({ error: 'Schedule check failed' }, { status: 500 })
     }
+  }
+}
+
+/**
+ * Unsubscribe handler — removes subscriber by token (public, GET).
+ */
+export function createUnsubscribeHandler(subscribersSlug: string): PayloadHandler {
+  return async (req) => {
+    const url = new URL(req.url || '', 'http://localhost')
+    const token = url.searchParams.get('token')
+    if (!token) return Response.json({ error: 'Missing token' }, { status: 400 })
+
+    const result = await req.payload.find({
+      collection: subscribersSlug as any,
+      where: { unsubscribeToken: { equals: token } },
+      limit: 1,
+    })
+
+    if (!result.docs.length) {
+      return Response.json({ error: 'Invalid token' }, { status: 404 })
+    }
+
+    await req.payload.delete({
+      collection: subscribersSlug as any,
+      id: result.docs[0].id,
+    })
+
+    // Return a simple HTML page confirming unsubscription
+    return new Response(
+      '<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc"><div style="text-align:center"><h1>&#10003;</h1><p>You have been unsubscribed.</p></div></body></html>',
+      { status: 200, headers: { 'Content-Type': 'text/html' } },
+    )
   }
 }

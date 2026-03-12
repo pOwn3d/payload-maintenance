@@ -2,7 +2,7 @@
 <div align="center">
 
   <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fpayload-maintenance;Payload+CMS+Maintenance+Mode;8+Templates+%7C+8+Presets;i18n+10+Languages+%7C+Webhooks;Scheduling+%7C+Newsletter+%7C+503+SEO" alt="Typing SVG" />
+    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fpayload-maintenance;Payload+CMS+Maintenance+Mode;12+Templates+%7C+12+Presets;i18n+10+Languages+%7C+Webhooks;Scheduling+%7C+Newsletter+%7C+503+SEO" alt="Typing SVG" />
   </a>
 
   <br><br>
@@ -11,7 +11,7 @@
   <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/v/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
   <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/dw/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
   <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
-  <img src="https://img.shields.io/badge/Templates-8-8B5CF6?style=for-the-badge" alt="8 Templates">
+  <img src="https://img.shields.io/badge/Templates-12-8B5CF6?style=for-the-badge" alt="12 Templates">
   <img src="https://img.shields.io/badge/i18n-10+Languages-F59E0B?style=for-the-badge&logo=translate&logoColor=white" alt="i18n">
   <a href="https://github.com/pOwn3d/payload-maintenance/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-7C3AED?style=for-the-badge" alt="MIT License"></a>
   <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
@@ -22,14 +22,14 @@
 
 ## About
 
-> **@consilioweb/payload-maintenance** — A complete, production-ready maintenance mode plugin for Payload CMS 3 + Next.js. Includes 8 professional templates, 8 one-click presets, i18n in 10 languages, scheduled maintenance, newsletter subscribers with CSV export, audit history, webhooks (Slack/Discord), HTTP 503 SEO, and a full admin dashboard.
+> **@consilioweb/payload-maintenance** — A complete, production-ready maintenance mode plugin for Payload CMS 3 + Next.js. Includes 12 professional templates (Aurora, Neon, Mesh, Particles...), 12 one-click presets, i18n in 10 languages, scheduled maintenance, GDPR-compliant newsletter with unsubscribe, audit history, webhooks with retry (Slack/Discord), rate limiting, HTTP 503 SEO, and a full admin dashboard. **Self-contained** — no manual route needed.
 
 <table>
   <tr>
     <td align="center" width="25%">
       <img src="https://img.icons8.com/color/96/maintenance.png" width="50"/><br>
-      <b>8 Templates</b><br>
-      <sub>Minimal to Glassmorphism</sub>
+      <b>12 Templates</b><br>
+      <sub>Aurora, Neon, Mesh, Particles...</sub>
     </td>
     <td align="center" width="25%">
       <img src="https://img.icons8.com/color/96/language.png" width="50"/><br>
@@ -60,7 +60,7 @@
     </td>
     <td align="center" width="25%">
       <img src="https://img.icons8.com/color/96/paint-palette.png" width="50"/><br>
-      <b>8 Presets</b><br>
+      <b>12 Presets</b><br>
       <sub>One-click apply</sub>
     </td>
     <td align="center" width="25%">
@@ -93,7 +93,7 @@
 
 ## Features
 
-### 8 Professional Templates
+### 12 Professional Templates
 
 | Template | Description |
 |----------|-------------|
@@ -104,9 +104,13 @@
 | `gradient` | Multi-color animated gradient background |
 | `split-screen` | Content left, image right (responsive) |
 | `video-background` | MP4 video with overlay |
+| `aurora` | **NEW** Northern lights with animated gradient layers, floating particles, SVG waves |
+| `neon` | **NEW** Cyberpunk with pulsing neon glow, grid background, scanline, corner brackets |
+| `mesh` | **NEW** Apple-like animated blobs with mix-blend-mode and noise texture |
+| `particles` | **NEW** Canvas-based interactive particle system with mouse interaction |
 | `custom` | Full custom HTML with `{{variables}}` |
 
-### 8 One-Click Presets
+### 12 One-Click Presets
 
 Pre-configured templates with colors, fonts, and messages — apply in one click from admin:
 
@@ -120,6 +124,10 @@ Pre-configured templates with colors, fonts, and messages — apply in one click
 | `light-clean` | minimal | Light mode (Plus Jakarta Sans) |
 | `warm-gradient` | gradient | Warm orange tones (Poppins) |
 | `tech-dark` | countdown | Cyan tech (JetBrains Mono) |
+| `aurora-borealis` | aurora | **NEW** Teal/violet northern lights (Space Grotesk) |
+| `cyberpunk-neon` | neon | **NEW** Magenta/cyan cyberpunk (Orbitron) |
+| `mesh-modern` | mesh | **NEW** Indigo/rose modern blobs (Geist) |
+| `particles-cosmic` | particles | **NEW** Deep space constellation (Inter) |
 
 ### Multi-Language (i18n)
 
@@ -134,13 +142,23 @@ Pre-configured templates with colors, fonts, and messages — apply in one click
 - Auto-enable and auto-disable toggles
 - Schedule check endpoint for cron integration
 
-### Newsletter Subscribers
+### Newsletter Subscribers (GDPR-compliant)
 
 - Email signup form on the maintenance page
+- **GDPR consent** required (`consent: true` in POST body)
+- `consentAt`, `consentSource` stored per subscriber
+- **Unsubscribe endpoint** with unique token per subscriber
 - Stored in a dedicated Payload collection
 - Duplicate prevention
 - CSV export endpoint for admin users
 - Tracks language, IP, user-agent
+
+### Security & Rate Limiting
+
+- **Rate limiting** on all public endpoints (status: 60/min, newsletter: 5/min, track: 30/min per IP)
+- **Auth check** on all admin endpoints (toggle, stats, export, analytics, schedule-check, presets apply)
+- **Email validation** with regex on newsletter signup
+- **Webhook retry** with exponential backoff (3 attempts: 1s, 2s, 4s)
 
 ### Audit History
 
@@ -251,24 +269,7 @@ export const config = {
 }
 ```
 
-### 3. Create the maintenance page
-
-```tsx
-// src/app/(frontend)/maintenance/page.tsx
-import { MaintenancePage } from '@consilioweb/payload-maintenance/client'
-
-export const dynamic = 'force-dynamic'
-export const metadata = {
-  title: 'Maintenance',
-  robots: { index: false, follow: false },
-}
-
-export default function MaintenanceRoute() {
-  return <MaintenancePage />
-}
-```
-
-### 4. Regenerate importmap
+### 3. Regenerate importmap
 
 ```bash
 pnpm generate:importmap
@@ -276,10 +277,12 @@ pnpm generate:importmap
 
 That's it! The plugin automatically adds:
 - A **Maintenance** global in Settings
-- **2 collections** (subscribers + history)
-- **9 API endpoints**
+- **4 collections** (subscribers, history, analytics, webhook-logs)
+- **13 API endpoints** (including standalone HTML page — no route needed!)
 - An admin **dashboard view** at `/admin/maintenance`
 - A **toggle widget** on the admin dashboard
+
+> **Note**: The maintenance page is **self-contained** — the plugin serves a standalone HTML page via `/api/maintenance/page`. No need to create a `/maintenance` route in your Next.js app.
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
@@ -328,7 +331,11 @@ That's it! The plugin automatically adds:
 | `GET` | `/api/maintenance/subscribers/export` | Admin | CSV export |
 | `GET` | `/api/maintenance/presets` | Public | List available presets |
 | `POST` | `/api/maintenance/presets/apply` | Admin | Apply a preset |
-| `GET` | `/api/maintenance/schedule-check` | Public | Check scheduled dates |
+| `GET` | `/api/maintenance/schedule-check` | Admin | Check scheduled dates |
+| `GET` | `/api/maintenance/page` | Public | Standalone HTML maintenance page |
+| `POST` | `/api/maintenance/track` | Public | Analytics page view tracking |
+| `GET` | `/api/maintenance/analytics` | Admin | Analytics data |
+| `GET` | `/api/maintenance/unsubscribe` | Public | Unsubscribe by token |
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
@@ -345,6 +352,9 @@ The plugin automatically creates two collections:
 | `subscribedAt` | date | Registration date |
 | `ip` | text | IP address |
 | `userAgent` | text | Browser user agent |
+| `consentAt` | date | GDPR consent timestamp |
+| `consentSource` | text | Consent origin (maintenance-page) |
+| `unsubscribeToken` | text (unique) | Token for unsubscribe link |
 
 ### `maintenance-history`
 
@@ -427,9 +437,8 @@ import type { MaintenanceMiddlewareConfig } from '@consilioweb/payload-maintenan
 
 1. Remove the plugin from `payload.config.ts`
 2. Remove the middleware from `src/middleware.ts`
-3. Remove the maintenance page from `src/app/(frontend)/maintenance/`
-4. Uninstall: `pnpm remove @consilioweb/payload-maintenance`
-5. Regenerate importmap: `pnpm generate:importmap`
+3. Uninstall: `pnpm remove @consilioweb/payload-maintenance`
+4. Regenerate importmap: `pnpm generate:importmap`
 
 ### Data cleanup (optional)
 

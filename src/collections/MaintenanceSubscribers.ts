@@ -51,6 +51,25 @@ export function createSubscribersCollection(slug: string = 'maintenance-subscrib
         label: { en: 'User Agent', fr: 'User Agent' },
         admin: { readOnly: true },
       },
+      {
+        name: 'consentAt',
+        type: 'date',
+        label: { en: 'Consent date', fr: 'Date de consentement' },
+        admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
+      },
+      {
+        name: 'consentSource',
+        type: 'text',
+        label: { en: 'Consent source', fr: 'Source du consentement' },
+        admin: { readOnly: true },
+      },
+      {
+        name: 'unsubscribeToken',
+        type: 'text',
+        label: { en: 'Unsubscribe token', fr: 'Token de desinscription' },
+        unique: true,
+        admin: { readOnly: true },
+      },
     ],
   }
 }

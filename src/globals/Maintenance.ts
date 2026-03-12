@@ -13,6 +13,7 @@ export function createMaintenanceGlobal(
   const enableScheduling = pluginConfig.enableScheduling !== false
   const historySlug = pluginConfig.historySlug ?? 'maintenance-history'
   const enableHistory = pluginConfig.enableHistory !== false
+  const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
 
   return {
     slug,
@@ -66,12 +67,12 @@ export function createMaintenanceGlobal(
                 },
               })
 
-              // Fire webhooks
+              // Fire webhooks with retry and logging
               const webhooks = doc.webhooks as any[]
               if (webhooks?.length) {
                 for (const webhook of webhooks) {
                   if (!webhook.enabled || !webhook.url) continue
-                  fireWebhook(webhook, action, triggeredBy, req.payload.logger).catch(() => {})
+                  fireWebhook(webhook, action, triggeredBy, req.payload.logger, req.payload, webhookLogsSlug, historySlug).catch(() => {})
                 }
               }
             } catch (e) {
@@ -124,6 +125,10 @@ export function createMaintenanceGlobal(
               { label: { en: 'Gradient', fr: 'Gradient' }, value: 'gradient' },
               { label: { en: 'Split Screen', fr: 'Ecran divise' }, value: 'split-screen' },
               { label: { en: 'Video Background', fr: 'Video en fond' }, value: 'video-background' },
+              { label: { en: 'Aurora Borealis', fr: 'Aurore Boreale' }, value: 'aurora' },
+              { label: { en: 'Neon / Cyberpunk', fr: 'Neon / Cyberpunk' }, value: 'neon' },
+              { label: { en: 'Mesh Gradient', fr: 'Gradient Mesh' }, value: 'mesh' },
+              { label: { en: 'Particles', fr: 'Particules' }, value: 'particles' },
               { label: { en: 'Custom HTML', fr: 'HTML personnalise' }, value: 'custom' },
             ],
             admin: {
@@ -135,6 +140,27 @@ export function createMaintenanceGlobal(
             },
           },
         ],
+      },
+      {
+        name: 'maintenanceType',
+        type: 'select',
+        label: {
+          en: 'Maintenance type',
+          fr: 'Type de maintenance',
+        },
+        defaultValue: 'maintenance',
+        options: [
+          { label: { en: 'Maintenance', fr: 'Maintenance' }, value: 'maintenance' },
+          { label: { en: 'Coming Soon', fr: 'Bientot disponible' }, value: 'coming-soon' },
+          { label: { en: 'Upgrade', fr: 'Mise a jour' }, value: 'upgrade' },
+          { label: { en: 'Emergency', fr: 'Urgence' }, value: 'emergency' },
+        ],
+        admin: {
+          description: {
+            en: 'Type of maintenance — changes default icon and messaging on the page',
+            fr: 'Type de maintenance — change l\'icone et le message par defaut sur la page',
+          },
+        },
       },
       {
         name: 'estimatedEnd',
@@ -665,12 +691,15 @@ export function createMaintenanceGlobal(
   }
 }
 
-// Webhook helper
+// Webhook helper with exponential backoff retry (max 3 attempts)
 async function fireWebhook(
   webhook: { type: string; url: string },
   action: string,
   triggeredBy: string,
   logger: any,
+  payload?: any,
+  webhookLogsSlug?: string,
+  historySlug?: string,
 ) {
   const timestamp = new Date().toISOString()
   let body: string
@@ -699,20 +728,103 @@ async function fireWebhook(
     return
   }
 
-  const controller = new AbortController()
-  const timeout = setTimeout(() => controller.abort(), 5000)
+  const maxAttempts = 3
+  const backoffMs = [1000, 2000, 4000]
+  let lastStatusCode: number | undefined
+  let lastResponseBody: string | undefined
+  let success = false
 
-  try {
-    await fetch(webhook.url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body,
-      signal: controller.signal,
-    })
-    logger.info(`[maintenance] Webhook fired: ${webhook.type} → ${action}`)
-  } catch (e) {
-    logger.error(`[maintenance] Webhook error: ${e}`)
-  } finally {
-    clearTimeout(timeout)
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    const controller = new AbortController()
+    const timeout = setTimeout(() => controller.abort(), 5000)
+
+    try {
+      const res = await fetch(webhook.url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body,
+        signal: controller.signal,
+      })
+      lastStatusCode = res.status
+      lastResponseBody = await res.text().catch(() => '')
+
+      if (res.ok) {
+        logger.info(`[maintenance] Webhook fired: ${webhook.type} → ${action} (attempt ${attempt})`)
+        success = true
+
+        // Log success to webhook logs collection
+        if (payload && webhookLogsSlug) {
+          payload.create({
+            collection: webhookLogsSlug,
+            data: {
+              webhookUrl: webhook.url,
+              webhookType: webhook.type,
+              action,
+              status: 'success',
+              statusCode: lastStatusCode,
+              responseBody: (lastResponseBody || '').slice(0, 2000),
+              attempts: attempt,
+              timestamp: new Date().toISOString(),
+            },
+          }).catch(() => {})
+        }
+
+        clearTimeout(timeout)
+        return
+      }
+
+      logger.warn(`[maintenance] Webhook attempt ${attempt}/${maxAttempts} failed with status ${res.status}: ${webhook.type}`)
+    } catch (e) {
+      logger.warn(`[maintenance] Webhook attempt ${attempt}/${maxAttempts} error: ${e}`)
+      lastResponseBody = String(e)
+    } finally {
+      clearTimeout(timeout)
+    }
+
+    // Wait with exponential backoff before retrying (except on last attempt)
+    if (attempt < maxAttempts) {
+      await new Promise((resolve) => setTimeout(resolve, backoffMs[attempt - 1]))
+    }
+  }
+
+  // All retries failed
+  if (!success) {
+    logger.error(`[maintenance] Webhook failed after ${maxAttempts} attempts: ${webhook.type} → ${webhook.url}`)
+
+    // Log failure to webhook logs collection
+    if (payload && webhookLogsSlug) {
+      payload.create({
+        collection: webhookLogsSlug,
+        data: {
+          webhookUrl: webhook.url,
+          webhookType: webhook.type,
+          action,
+          status: 'failed',
+          statusCode: lastStatusCode || 0,
+          responseBody: (lastResponseBody || '').slice(0, 2000),
+          attempts: maxAttempts,
+          timestamp: new Date().toISOString(),
+        },
+      }).catch(() => {})
+    }
+
+    // Log failure to maintenance history collection
+    if (payload && historySlug) {
+      payload.create({
+        collection: historySlug,
+        data: {
+          action: 'webhook-failed',
+          triggeredBy: `webhook:${webhook.type}`,
+          timestamp: new Date().toISOString(),
+          details: {
+            webhookUrl: webhook.url,
+            webhookType: webhook.type,
+            originalAction: action,
+            attempts: maxAttempts,
+            lastStatusCode,
+          },
+        },
+      }).catch(() => {})
+    }
   }
 }

@@ -22,6 +22,8 @@ export type MaintenanceTemplate =
   | 'split-screen'
   | 'video-background'
 
+export type MaintenanceType = 'maintenance' | 'coming-soon' | 'upgrade' | 'emergency'
+
 export interface WebhookConfig {
   url: string
   type: 'slack' | 'discord' | 'custom'
@@ -86,11 +88,21 @@ export interface MaintenancePluginConfig {
 
   /** Users collection slug for auth bypass (default: 'users') */
   usersCollectionSlug?: string
+
+  /** Enable page view analytics during maintenance (default: true) */
+  enableAnalytics?: boolean
+
+  /** Slug for the analytics collection (default: 'maintenance-analytics') */
+  analyticsSlug?: string
+
+  /** Slug for the webhook logs collection (default: 'maintenance-webhook-logs') */
+  webhookLogsSlug?: string
 }
 
 export interface MaintenanceStatus {
   enabled: boolean
   template: MaintenanceTemplate
+  maintenanceType?: MaintenanceType
   messages: MaintenanceMessage[]
   estimatedEnd?: string | null
   allowedIPs?: string[]

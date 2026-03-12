@@ -313,6 +313,150 @@ export const presets: MaintenancePreset[] = [
       },
     },
   },
+
+  // ─── 9. Aurora Borealis ───
+  {
+    id: 'aurora-borealis',
+    name: { fr: 'Aurore Boreale', en: 'Aurora Borealis' },
+    description: {
+      fr: 'Effet aurore boreale avec gradients animes et particules flottantes. Immersif et poetique.',
+      en: 'Northern lights effect with animated gradients and floating particles. Immersive and poetic.',
+    },
+    preview: 'linear-gradient(180deg, #0a0e27, #0d9488, #7c3aed, #0a0e27)',
+    config: {
+      template: 'aurora',
+      backgroundColor: '#0a0e27',
+      textColor: '#e0f2fe',
+      accentColor: '#2dd4bf',
+      backgroundOverlayOpacity: 0,
+      showProgressBar: false,
+      darkMode: 'dark',
+      showNewsletterForm: true,
+      googleFont: 'Space Grotesk',
+      messages: {
+        fr: {
+          title: 'Le spectacle se prepare',
+          description: 'Notre site se transforme sous les lumieres du nord.\nRevenez bientot pour decouvrir la nouvelle experience.',
+          buttonLabel: 'Nous contacter',
+          buttonUrl: 'mailto:contact@example.com',
+        },
+        en: {
+          title: 'The show is being prepared',
+          description: 'Our site is transforming under the northern lights.\nCome back soon to discover the new experience.',
+          buttonLabel: 'Contact us',
+          buttonUrl: 'mailto:contact@example.com',
+        },
+      },
+    },
+  },
+
+  // ─── 10. Cyberpunk Neon ───
+  {
+    id: 'cyberpunk-neon',
+    name: { fr: 'Cyberpunk Neon', en: 'Cyberpunk Neon' },
+    description: {
+      fr: 'Style cyberpunk avec effets neon pulses, grille en fond et scanline. Futuriste et audacieux.',
+      en: 'Cyberpunk style with pulsing neon effects, background grid and scanline. Futuristic and bold.',
+    },
+    preview: 'linear-gradient(135deg, #0a0a0a, #1a0a2e, #ff00ff22)',
+    config: {
+      template: 'neon',
+      backgroundColor: '#0a0a0a',
+      textColor: '#f0f0f0',
+      accentColor: '#ff00ff',
+      backgroundOverlayOpacity: 0,
+      showProgressBar: false,
+      darkMode: 'dark',
+      showNewsletterForm: true,
+      googleFont: 'Orbitron',
+      messages: {
+        fr: {
+          title: 'SYSTEME EN MISE A JOUR',
+          description: 'Les circuits sont en cours de reconfiguration.\nReconnexion imminente.',
+          buttonLabel: 'Status',
+          buttonUrl: '#',
+        },
+        en: {
+          title: 'SYSTEM UPGRADING',
+          description: 'Circuits are being reconfigured.\nReconnection imminent.',
+          buttonLabel: 'Status',
+          buttonUrl: '#',
+        },
+      },
+    },
+  },
+
+  // ─── 11. Mesh Modern ───
+  {
+    id: 'mesh-modern',
+    name: { fr: 'Mesh Moderne', en: 'Mesh Modern' },
+    description: {
+      fr: 'Gradient mesh anime avec blobs fluides. Esthetique Apple moderne, epure et elegant.',
+      en: 'Animated mesh gradient with fluid blobs. Modern Apple-like aesthetic, clean and elegant.',
+    },
+    preview: 'linear-gradient(135deg, #0f0f23, #6366f1, #a78bfa, #f472b6)',
+    config: {
+      template: 'mesh',
+      backgroundColor: '#0f0f23',
+      textColor: '#f8fafc',
+      accentColor: '#818cf8',
+      backgroundOverlayOpacity: 0,
+      showProgressBar: false,
+      darkMode: 'dark',
+      showNewsletterForm: true,
+      googleFont: 'Geist',
+      messages: {
+        fr: {
+          title: 'Nouvelle version en approche',
+          description: 'Nous concevons une experience fluide et moderne.\nChaque pixel compte.',
+          buttonLabel: '',
+          buttonUrl: '',
+        },
+        en: {
+          title: 'New version approaching',
+          description: 'We\'re crafting a fluid and modern experience.\nEvery pixel counts.',
+          buttonLabel: '',
+          buttonUrl: '',
+        },
+      },
+    },
+  },
+
+  // ─── 12. Particles Cosmic ───
+  {
+    id: 'particles-cosmic',
+    name: { fr: 'Particules Cosmiques', en: 'Particles Cosmic' },
+    description: {
+      fr: 'Systeme de particules interactif avec effet constellation. Spatial et immersif.',
+      en: 'Interactive particle system with constellation effect. Spatial and immersive.',
+    },
+    preview: 'linear-gradient(135deg, #020617, #0f172a, #1e3a5f)',
+    config: {
+      template: 'particles',
+      backgroundColor: '#020617',
+      textColor: '#e2e8f0',
+      accentColor: '#60a5fa',
+      backgroundOverlayOpacity: 0,
+      showProgressBar: true,
+      darkMode: 'dark',
+      showNewsletterForm: true,
+      googleFont: 'Inter',
+      messages: {
+        fr: {
+          title: 'Dans les etoiles',
+          description: 'Notre univers numerique est en pleine expansion.\nBientot une nouvelle constellation de fonctionnalites.',
+          buttonLabel: 'Nous contacter',
+          buttonUrl: 'mailto:contact@example.com',
+        },
+        en: {
+          title: 'Among the stars',
+          description: 'Our digital universe is expanding.\nA new constellation of features is coming soon.',
+          buttonLabel: 'Contact us',
+          buttonUrl: 'mailto:contact@example.com',
+        },
+      },
+    },
+  },
 ]
 
 /**
