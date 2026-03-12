@@ -83,13 +83,31 @@ export function createMaintenanceGlobal(
       ],
     },
     admin: {
-      group: {
-        en: 'Settings',
-        fr: 'Parametres',
-      },
+      hidden: true,
     },
     fields: [
       // ─── Activation ───
+      {
+        type: 'row',
+        fields: [
+          {
+            name: 'showDashboardToggle',
+            type: 'checkbox',
+            label: {
+              en: 'Show toggle on main dashboard',
+              fr: 'Afficher le toggle sur le tableau de bord',
+            },
+            defaultValue: true,
+            admin: {
+              width: '100%',
+              description: {
+                en: 'Display the maintenance status toggle on the main admin dashboard (/admin)',
+                fr: 'Affiche le toggle de statut maintenance sur le tableau de bord principal (/admin)',
+              },
+            },
+          },
+        ],
+      },
       {
         type: 'row',
         fields: [

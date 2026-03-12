@@ -290,19 +290,27 @@ That's it! The plugin automatically adds:
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `globalSlug` | `string` | `'maintenance'` | Global config slug |
-| `endpointBasePath` | `string` | `'/maintenance'` | API endpoint prefix |
-| `languages` | `{label, value}[]` | `[{fr}, {en}]` | Available languages |
-| `excludedPaths` | `string[]` | `['/admin', '/api']` | Never-blocked paths |
-| `addDashboardView` | `boolean` | `true` | Add admin view |
-| `mediaCollectionSlug` | `string` | `'media'` | Upload collection |
-| `enableSubscribers` | `boolean` | `true` | Subscribers collection |
-| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Subscribers slug |
-| `enableHistory` | `boolean` | `true` | History collection |
-| `historySlug` | `string` | `'maintenance-history'` | History slug |
-| `enableScheduling` | `boolean` | `true` | Schedule fields |
-| `authBypass` | `boolean` | `true` | Bypass for logged-in users |
-| `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie name |
+| `globalSlug` | `string` | `'maintenance'` | Slug du global de configuration |
+| `endpointBasePath` | `string` | `'/maintenance'` | Préfixe des endpoints API |
+| `languages` | `{label, value}[]` | `[{fr}, {en}]` | Langues disponibles pour la page de maintenance |
+| `excludedPaths` | `string[]` | `['/admin', '/api']` | Chemins toujours accessibles (jamais bloqués) |
+| `allowedIPs` | `string[]` | `[]` | Adresses IP qui contournent le mode maintenance |
+| `bypassSecret` | `string` | `undefined` | Paramètre query secret pour contourner la maintenance (ex: `?bypass=secret123`) |
+| `maintenancePageComponent` | `string` | `undefined` | Chemin vers un composant custom pour la page de maintenance (remplace le défaut) |
+| `addDashboardView` | `boolean` | `true` | Ajouter la vue admin à `/admin/maintenance` |
+| `bypassCookieName` | `string` | `'maintenance-bypass'` | Nom du cookie de contournement |
+| `mediaCollectionSlug` | `string` | `'media'` | Slug de la collection pour les uploads |
+| `enableSubscribers` | `boolean` | `true` | Activer la collection d'abonnés newsletter |
+| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Slug de la collection abonnés |
+| `enableHistory` | `boolean` | `true` | Activer la collection d'historique/audit |
+| `historySlug` | `string` | `'maintenance-history'` | Slug de la collection historique |
+| `enableScheduling` | `boolean` | `true` | Activer la maintenance planifiée (activation/désactivation auto) |
+| `authBypass` | `boolean` | `true` | Les utilisateurs Payload connectés contournent la maintenance |
+| `usersCollectionSlug` | `string` | `'users'` | Slug de la collection utilisateurs pour le contournement auth |
+| `enableAnalytics` | `boolean` | `true` | Activer le suivi analytique des pages vues pendant la maintenance |
+| `analyticsSlug` | `string` | `'maintenance-analytics'` | Slug de la collection analytique |
+| `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug de la collection de logs webhook |
+| `showDashboardToggle` | `boolean` | `true` | Afficher le toggle maintenance sur le dashboard admin principal |
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 

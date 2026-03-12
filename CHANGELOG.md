@@ -5,6 +5,24 @@ All notable changes to `@consilioweb/payload-maintenance` will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-03-12
+
+### Fixed
+- **Double menu fix** — Collections (Subscribers, History) and global (Maintenance Mode) now hidden from Payload's default nav (`admin.hidden: true`) to avoid duplication when used with `@consilioweb/admin-nav`
+- All 4 collections (`maintenance-subscribers`, `maintenance-history`, `maintenance-analytics`, `maintenance-webhook-logs`) are now `admin.hidden: true`
+- Global `maintenance` set to `admin.hidden: true` (removed "Settings" group)
+
+### Note
+- Navigation is handled exclusively by `MaintenanceNavLink` (afterNavLinks): Dashboard, Abonnés, Historique, Configuration
+- Direct URL access to collections and global edit pages still works
+
+## [0.3.0] - 2026-03-12
+
+### Added
+- **Sidebar nav group with icons** — `MaintenanceNavLink` component injected via `afterNavLinks`, matching SEO plugin's design pattern (Dashboard, Subscribers, History, Settings)
+- Webhook logs collection (`maintenance-webhook-logs`) with delivery tracking
+- Analytics and webhook-logs collections hidden from default nav
+
 ## [0.2.0] - 2026-03-12
 
 ### Added
@@ -54,6 +72,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `createMaintenanceMiddleware()` for Next.js middleware integration
 - TypeScript strict mode, full type exports
 
+[0.3.1]: https://github.com/pOwn3d/payload-maintenance/compare/v0.3.0...v0.3.1
+[0.3.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.1.1...v0.2.0
 [0.1.1]: https://github.com/pOwn3d/payload-maintenance/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pOwn3d/payload-maintenance/releases/tag/v0.1.0

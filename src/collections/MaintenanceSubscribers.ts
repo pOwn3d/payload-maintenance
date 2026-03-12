@@ -8,6 +8,7 @@ export function createSubscribersCollection(slug: string = 'maintenance-subscrib
       plural: { en: 'Maintenance Subscribers', fr: 'Abonnes Maintenance' },
     },
     admin: {
+      hidden: true,
       group: { en: 'Settings', fr: 'Parametres' },
       defaultColumns: ['email', 'language', 'subscribedAt'],
       useAsTitle: 'email',

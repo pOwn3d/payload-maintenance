@@ -31,7 +31,7 @@ export const presets: MaintenancePreset[] = [
     id: 'corporate-blue',
     name: { fr: 'Corporate Bleu', en: 'Corporate Blue' },
     description: {
-      fr: 'Template professionnel sobre avec compte a rebours. Ideal pour les sites d\'entreprise.',
+      fr: 'Template professionnel sobre avec compte à rebours. Idéal pour les sites d\'entreprise.',
       en: 'Clean professional template with countdown. Perfect for business sites.',
     },
     preview: 'linear-gradient(135deg, #0f172a, #1e3a5f)',
@@ -48,7 +48,7 @@ export const presets: MaintenancePreset[] = [
       messages: {
         fr: {
           title: 'Maintenance en cours',
-          description: 'Notre site fait peau neuve pour vous offrir une meilleure experience.\nNous serons de retour tres bientot.',
+          description: 'Notre site fait peau neuve pour vous offrir une meilleure expérience.\nNous serons de retour très bientôt.',
           buttonLabel: 'Nous contacter',
           buttonUrl: 'mailto:contact@example.com',
         },
@@ -67,7 +67,7 @@ export const presets: MaintenancePreset[] = [
     id: 'startup-launch',
     name: { fr: 'Lancement Startup', en: 'Startup Launch' },
     description: {
-      fr: 'Template dynamique pour les lancements de produit. Gradient anime avec compte a rebours flip.',
+      fr: 'Template dynamique pour les lancements de produit. Gradient animé avec compte à rebours flip.',
       en: 'Dynamic template for product launches. Animated gradient with flip countdown.',
     },
     preview: 'linear-gradient(-45deg, #6366f1, #a855f7, #ec4899)',
@@ -84,7 +84,7 @@ export const presets: MaintenancePreset[] = [
       messages: {
         fr: {
           title: 'Quelque chose d\'incroyable arrive',
-          description: 'Nous preparons une experience revolutionnaire.\nInscrivez-vous pour etre les premiers informes.',
+          description: 'Nous préparons une expérience révolutionnaire.\nInscrivez-vous pour être les premiers informés.',
           buttonLabel: '',
           buttonUrl: '',
         },
@@ -103,7 +103,7 @@ export const presets: MaintenancePreset[] = [
     id: 'minimal-elegant',
     name: { fr: 'Minimal Elegant', en: 'Minimal Elegant' },
     description: {
-      fr: 'Template minimaliste et elegant. Sobre, efficace, professionnel.',
+      fr: 'Template minimaliste et élégant. Sobre, efficace, professionnel.',
       en: 'Minimalist and elegant template. Clean, effective, professional.',
     },
     preview: 'linear-gradient(135deg, #18181b, #27272a)',
@@ -139,7 +139,7 @@ export const presets: MaintenancePreset[] = [
     id: 'glass-premium',
     name: { fr: 'Glass Premium', en: 'Glass Premium' },
     description: {
-      fr: 'Effet verre depoli premium. Moderne et luxueux avec des orbes flottants.',
+      fr: 'Effet verre dépoli premium. Moderne et luxueux avec des orbes flottants.',
       en: 'Premium frosted glass effect. Modern and luxurious with floating orbs.',
     },
     preview: 'linear-gradient(135deg, #0c0a3e, #1a0533, #3a0647)',
@@ -155,9 +155,9 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Outfit',
       messages: {
         fr: {
-          title: 'Experience en preparation',
-          description: 'Nous peaufinons chaque detail pour creer quelque chose d\'exceptionnel.\nVotre patience est notre plus belle recompense.',
-          buttonLabel: 'Decouvrir bientot',
+          title: 'Expérience en préparation',
+          description: 'Nous peaufinons chaque détail pour créer quelque chose d\'exceptionnel.\nVotre patience est notre plus belle récompense.',
+          buttonLabel: 'Découvrir bientôt',
           buttonUrl: '#',
         },
         en: {
@@ -173,9 +173,9 @@ export const presets: MaintenancePreset[] = [
   // ─── 5. Coming Soon Creative ───
   {
     id: 'coming-soon-creative',
-    name: { fr: 'Coming Soon Creatif', en: 'Coming Soon Creative' },
+    name: { fr: 'Coming Soon Créatif', en: 'Coming Soon Creative' },
     description: {
-      fr: 'Template creatif pour les agences et freelances. Flip countdown avec style audacieux.',
+      fr: 'Template créatif pour les agences et freelances. Flip countdown avec style audacieux.',
       en: 'Creative template for agencies and freelancers. Flip countdown with bold style.',
     },
     preview: 'linear-gradient(135deg, #064e3b, #0d9488)',
@@ -191,8 +191,8 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Sora',
       messages: {
         fr: {
-          title: 'Bientot en ligne',
-          description: 'Un nouveau projet passionnant est en cours de realisation.\nRestez connectes pour ne rien manquer.',
+          title: 'Bientôt en ligne',
+          description: 'Un nouveau projet passionnant est en cours de réalisation.\nRestez connectés pour ne rien manquer.',
           buttonLabel: '',
           buttonUrl: '',
         },
@@ -209,9 +209,9 @@ export const presets: MaintenancePreset[] = [
   // ─── 6. Light Mode Clean ───
   {
     id: 'light-clean',
-    name: { fr: 'Light Mode Epure', en: 'Light Mode Clean' },
+    name: { fr: 'Light Mode Épuré', en: 'Light Mode Clean' },
     description: {
-      fr: 'Template lumineux et epure. Ideal pour les marques minimalistes ou lifestyle.',
+      fr: 'Template lumineux et épuré. Idéal pour les marques minimalistes ou lifestyle.',
       en: 'Bright and clean template. Perfect for minimalist or lifestyle brands.',
     },
     preview: 'linear-gradient(135deg, #ffffff, #f1f5f9)',
@@ -227,8 +227,8 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Plus Jakarta Sans',
       messages: {
         fr: {
-          title: 'Maintenance programmee',
-          description: 'Nous ameliorons notre site pour mieux vous servir.\nLe service sera retabli dans quelques instants.',
+          title: 'Maintenance programmée',
+          description: 'Nous améliorons notre site pour mieux vous servir.\nLe service sera rétabli dans quelques instants.',
           buttonLabel: 'En savoir plus',
           buttonUrl: 'mailto:contact@example.com',
         },
@@ -247,7 +247,7 @@ export const presets: MaintenancePreset[] = [
     id: 'warm-gradient',
     name: { fr: 'Gradient Chaleureux', en: 'Warm Gradient' },
     description: {
-      fr: 'Gradient anime aux tons chauds. Ideal pour la restauration, le bien-etre, le lifestyle.',
+      fr: 'Gradient animé aux tons chauds. Idéal pour la restauration, le bien-être, le lifestyle.',
       en: 'Animated warm-toned gradient. Perfect for food, wellness, lifestyle.',
     },
     preview: 'linear-gradient(-45deg, #f97316, #ef4444, #ec4899, #f59e0b)',
@@ -264,7 +264,7 @@ export const presets: MaintenancePreset[] = [
       messages: {
         fr: {
           title: 'On revient avec du nouveau',
-          description: 'Notre equipe prepare une nouvelle experience pour vous.\nRestez a l\'ecoute, ca arrive tres vite !',
+          description: 'Notre équipe prépare une nouvelle expérience pour vous.\nRestez à l\'écoute, ça arrive très vite !',
           buttonLabel: 'Nous contacter',
           buttonUrl: 'mailto:contact@example.com',
         },
@@ -283,7 +283,7 @@ export const presets: MaintenancePreset[] = [
     id: 'tech-dark',
     name: { fr: 'Tech Sombre', en: 'Tech Dark' },
     description: {
-      fr: 'Template technique sombre. Ideal pour les SaaS, les startups tech, les outils dev.',
+      fr: 'Template technique sombre. Idéal pour les SaaS, les startups tech, les outils dev.',
       en: 'Dark technical template. Perfect for SaaS, tech startups, dev tools.',
     },
     preview: 'linear-gradient(135deg, #030712, #111827)',
@@ -299,8 +299,8 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'JetBrains Mono',
       messages: {
         fr: {
-          title: 'Deploiement en cours',
-          description: 'Nous mettons a jour nos systemes.\nTemps d\'arret estime : quelques minutes.',
+          title: 'Déploiement en cours',
+          description: 'Nous mettons à jour nos systèmes.\nTemps d\'arrêt estimé : quelques minutes.',
           buttonLabel: 'Status page',
           buttonUrl: '#',
         },
@@ -317,9 +317,9 @@ export const presets: MaintenancePreset[] = [
   // ─── 9. Aurora Borealis ───
   {
     id: 'aurora-borealis',
-    name: { fr: 'Aurore Boreale', en: 'Aurora Borealis' },
+    name: { fr: 'Aurore Boréale', en: 'Aurora Borealis' },
     description: {
-      fr: 'Effet aurore boreale avec gradients animes et particules flottantes. Immersif et poetique.',
+      fr: 'Effet aurore boréale avec gradients animés et particules flottantes. Immersif et poétique.',
       en: 'Northern lights effect with animated gradients and floating particles. Immersive and poetic.',
     },
     preview: 'linear-gradient(180deg, #0a0e27, #0d9488, #7c3aed, #0a0e27)',
@@ -335,8 +335,8 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Space Grotesk',
       messages: {
         fr: {
-          title: 'Le spectacle se prepare',
-          description: 'Notre site se transforme sous les lumieres du nord.\nRevenez bientot pour decouvrir la nouvelle experience.',
+          title: 'Le spectacle se prépare',
+          description: 'Notre site se transforme sous les lumières du nord.\nRevenez bientôt pour découvrir la nouvelle expérience.',
           buttonLabel: 'Nous contacter',
           buttonUrl: 'mailto:contact@example.com',
         },
@@ -355,7 +355,7 @@ export const presets: MaintenancePreset[] = [
     id: 'cyberpunk-neon',
     name: { fr: 'Cyberpunk Neon', en: 'Cyberpunk Neon' },
     description: {
-      fr: 'Style cyberpunk avec effets neon pulses, grille en fond et scanline. Futuriste et audacieux.',
+      fr: 'Style cyberpunk avec effets néon pulsés, grille en fond et scanline. Futuriste et audacieux.',
       en: 'Cyberpunk style with pulsing neon effects, background grid and scanline. Futuristic and bold.',
     },
     preview: 'linear-gradient(135deg, #0a0a0a, #1a0a2e, #ff00ff22)',
@@ -371,7 +371,7 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Orbitron',
       messages: {
         fr: {
-          title: 'SYSTEME EN MISE A JOUR',
+          title: 'SYSTÈME EN MISE À JOUR',
           description: 'Les circuits sont en cours de reconfiguration.\nReconnexion imminente.',
           buttonLabel: 'Status',
           buttonUrl: '#',
@@ -391,7 +391,7 @@ export const presets: MaintenancePreset[] = [
     id: 'mesh-modern',
     name: { fr: 'Mesh Moderne', en: 'Mesh Modern' },
     description: {
-      fr: 'Gradient mesh anime avec blobs fluides. Esthetique Apple moderne, epure et elegant.',
+      fr: 'Gradient mesh animé avec blobs fluides. Esthétique Apple moderne, épuré et élégant.',
       en: 'Animated mesh gradient with fluid blobs. Modern Apple-like aesthetic, clean and elegant.',
     },
     preview: 'linear-gradient(135deg, #0f0f23, #6366f1, #a78bfa, #f472b6)',
@@ -408,7 +408,7 @@ export const presets: MaintenancePreset[] = [
       messages: {
         fr: {
           title: 'Nouvelle version en approche',
-          description: 'Nous concevons une experience fluide et moderne.\nChaque pixel compte.',
+          description: 'Nous concevons une expérience fluide et moderne.\nChaque pixel compte.',
           buttonLabel: '',
           buttonUrl: '',
         },
@@ -443,8 +443,8 @@ export const presets: MaintenancePreset[] = [
       googleFont: 'Inter',
       messages: {
         fr: {
-          title: 'Dans les etoiles',
-          description: 'Notre univers numerique est en pleine expansion.\nBientot une nouvelle constellation de fonctionnalites.',
+          title: 'Dans les étoiles',
+          description: 'Notre univers numérique est en pleine expansion.\nBientôt une nouvelle constellation de fonctionnalités.',
           buttonLabel: 'Nous contacter',
           buttonUrl: 'mailto:contact@example.com',
         },

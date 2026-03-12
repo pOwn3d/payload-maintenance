@@ -8,6 +8,7 @@ export function createHistoryCollection(slug: string = 'maintenance-history'): C
       plural: { en: 'Maintenance History', fr: 'Historique Maintenance' },
     },
     admin: {
+      hidden: true,
       group: { en: 'Settings', fr: 'Parametres' },
       defaultColumns: ['action', 'triggeredBy', 'timestamp', 'duration'],
       useAsTitle: 'action',

@@ -175,25 +175,37 @@ export const MaintenanceDashboard: React.FC = () => {
   }
 
   return (
-    <div>
+    <div className="maintenance-dashboard" style={{ width: '100%', maxWidth: '100%', boxSizing: 'border-box' as const }}>
+      <style>{`
+        .template-default__wrap { max-width: 100% !important; width: 100% !important; }
+        .maintenance-dashboard { padding: var(--gutter-h, 2rem); }
+        .maint-switch { position: relative; width: 44px; height: 24px; border-radius: 12px; border: none; cursor: pointer; transition: background 0.25s ease; flex-shrink: 0; }
+        .maint-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: #fff; box-shadow: 0 1px 3px rgba(0,0,0,0.2); transition: transform 0.25s ease; }
+        .maint-switch[data-on="true"] { background: #ef4444; }
+        .maint-switch[data-on="false"] { background: #22c55e; }
+        .maint-switch[data-on="true"]::after { transform: translateX(20px); }
+        .maint-switch:disabled { opacity: 0.5; cursor: wait; }
+        .maint-header-btn { padding: 0.5rem 1rem; border-radius: 0.375rem; border: 1px solid var(--theme-elevation-150, rgba(128,128,128,0.2)); background: transparent; cursor: pointer; font-size: 0.8rem; font-weight: 500; color: var(--theme-text, inherit); transition: background 0.15s; }
+        .maint-header-btn:hover { background: var(--theme-elevation-50, rgba(128,128,128,0.06)); }
+        .maint-header-btn[data-active="true"] { background: var(--theme-elevation-100, rgba(128,128,128,0.1)); border-color: var(--theme-elevation-250, rgba(128,128,128,0.3)); }
+      `}</style>
       {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '2rem', flexWrap: 'wrap', gap: '1rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>{dt(lang, 'title')}</h1>
-          <p style={{ opacity: 0.7, margin: '0.25rem 0 0' }}>{dt(lang, 'subtitle')}</p>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem', flexWrap: 'wrap', gap: '0.75rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
+          <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: 0 }}>{dt(lang, 'title')}</h1>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <button className="maint-switch" data-on={String(status.enabled)} onClick={toggle} disabled={loading} title={status.enabled ? dt(lang, 'disable') : dt(lang, 'enable')} />
+            <span style={{ fontSize: '0.8rem', fontWeight: 500, color: status.enabled ? '#ef4444' : '#16a34a' }}>
+              {status.enabled ? dt(lang, 'maintenanceActive') : dt(lang, 'siteOnline')}
+            </span>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
-          <button onClick={() => { setShowPresets(!showPresets); setShowPreview(false) }}
-            style={{ padding: '0.6rem 1.2rem', borderRadius: '0.5rem', border: '1px solid rgba(168,85,247,0.3)', background: showPresets ? 'rgba(168,85,247,0.1)' : 'transparent', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500, color: '#a855f7' }}>
+        <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>
+          <button className="maint-header-btn" data-active={String(showPresets)} onClick={() => { setShowPresets(!showPresets); setShowPreview(false) }}>
             {showPresets ? dt(lang, 'hidePresets') : dt(lang, 'showPresets')}
           </button>
-          <button onClick={() => { setShowPreview(!showPreview); setShowPresets(false) }}
-            style={{ padding: '0.6rem 1.2rem', borderRadius: '0.5rem', border: '1px solid rgba(128,128,128,0.3)', background: 'transparent', cursor: 'pointer', fontSize: '0.85rem', fontWeight: 500 }}>
+          <button className="maint-header-btn" data-active={String(showPreview)} onClick={() => { setShowPreview(!showPreview); setShowPresets(false) }}>
             {showPreview ? dt(lang, 'hidePreview') : dt(lang, 'showPreview')}
-          </button>
-          <button onClick={toggle} disabled={loading}
-            style={{ padding: '0.6rem 1.5rem', borderRadius: '0.5rem', border: 'none', background: status.enabled ? '#22c55e' : '#ef4444', color: '#fff', cursor: loading ? 'wait' : 'pointer', fontSize: '0.9rem', fontWeight: 600, opacity: loading ? 0.6 : 1 }}>
-            {loading ? '...' : status.enabled ? dt(lang, 'disable') : dt(lang, 'enable')}
           </button>
         </div>
       </div>
@@ -246,8 +258,8 @@ export const MaintenanceDashboard: React.FC = () => {
                 </div>
                 {/* Info */}
                 <div style={{ padding: '0.75rem 1rem' }}>
-                  <h3 style={{ fontSize: '0.95rem', fontWeight: 600, margin: '0 0 0.25rem' }}>{preset.name.fr}</h3>
-                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: 0, lineHeight: 1.4 }}>{preset.description.fr}</p>
+                  <h3 style={{ fontSize: '0.95rem', fontWeight: 600, margin: '0 0 0.25rem' }}>{(preset.name as Record<string, string>)[lang] || preset.name.en}</h3>
+                  <p style={{ fontSize: '0.8rem', opacity: 0.6, margin: 0, lineHeight: 1.4 }}>{(preset.description as Record<string, string>)[lang] || preset.description.en}</p>
                 </div>
               </button>
             ))}
@@ -257,30 +269,21 @@ export const MaintenanceDashboard: React.FC = () => {
       )}
 
       {/* Stats cards */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-        <div style={{ padding: '1.25rem', borderRadius: '0.75rem', background: status.enabled ? 'rgba(239,68,68,0.08)' : 'rgba(34,197,94,0.08)', border: `1px solid ${status.enabled ? 'rgba(239,68,68,0.2)' : 'rgba(34,197,94,0.2)'}` }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-            <div style={{ width: 10, height: 10, borderRadius: '50%', background: status.enabled ? '#ef4444' : '#22c55e' }} />
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dt(lang, 'status')}</span>
-          </div>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700 }}>{status.enabled ? dt(lang, 'maintenanceActive') : dt(lang, 'siteOnline')}</span>
+      <div style={{ display: 'grid', gridTemplateColumns: `repeat(${(status.scheduledStart || status.scheduledEnd) ? 3 : 2}, 1fr)`, gap: '1rem', marginBottom: '1.5rem' }}>
+        <div style={{ padding: '1rem 1.25rem', borderRadius: '0.5rem', background: 'var(--theme-elevation-50, rgba(128,128,128,0.04))', border: '1px solid var(--theme-elevation-150, rgba(128,128,128,0.15))' }}>
+          <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, display: 'block', marginBottom: '0.25rem' }}>{dt(lang, 'template')}</span>
+          <span style={{ fontSize: '1rem', fontWeight: 600, textTransform: 'capitalize' }}>{status.template}</span>
         </div>
-        <div style={{ padding: '1.25rem', borderRadius: '0.75rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
-          <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>{dt(lang, 'template')}</span>
-          <span style={{ fontSize: '1.1rem', fontWeight: 700, textTransform: 'capitalize' }}>{status.template}</span>
-        </div>
-        {stats && (
-          <div style={{ padding: '1.25rem', borderRadius: '0.75rem', background: 'rgba(168,85,247,0.08)', border: '1px solid rgba(168,85,247,0.2)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.5rem' }}>
-              <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{dt(lang, 'subscribers')}</span>
-              {stats.subscribersCount > 0 && <a href="/api/maintenance/subscribers/export" style={{ fontSize: '0.7rem', color: '#a855f7' }}>CSV</a>}
-            </div>
-            <span style={{ fontSize: '1.5rem', fontWeight: 700 }}>{stats.subscribersCount}</span>
+        <div style={{ padding: '1rem 1.25rem', borderRadius: '0.5rem', background: 'var(--theme-elevation-50, rgba(128,128,128,0.04))', border: '1px solid var(--theme-elevation-150, rgba(128,128,128,0.15))' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5 }}>{dt(lang, 'subscribers')}</span>
+            {stats && stats.subscribersCount > 0 && <a href="/api/maintenance/subscribers/export" style={{ fontSize: '0.65rem', opacity: 0.6, textDecoration: 'underline' }}>CSV</a>}
           </div>
-        )}
+          <span style={{ fontSize: '1rem', fontWeight: 600 }}>{stats?.subscribersCount ?? 0}</span>
+        </div>
         {(status.scheduledStart || status.scheduledEnd) && (
-          <div style={{ padding: '1.25rem', borderRadius: '0.75rem', background: 'rgba(251,191,36,0.08)', border: '1px solid rgba(251,191,36,0.2)' }}>
-            <span style={{ fontSize: '0.8rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', display: 'block', marginBottom: '0.5rem' }}>{dt(lang, 'scheduling')}</span>
+          <div style={{ padding: '1rem 1.25rem', borderRadius: '0.5rem', background: 'rgba(251,191,36,0.06)', border: '1px solid rgba(251,191,36,0.15)' }}>
+            <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5, display: 'block', marginBottom: '0.25rem' }}>{dt(lang, 'scheduling')}</span>
             {status.scheduledStart && <div style={{ fontSize: '0.8rem' }}>{dt(lang, 'schedStart')}: {new Date(status.scheduledStart).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')}</div>}
             {status.scheduledEnd && <div style={{ fontSize: '0.8rem' }}>{dt(lang, 'schedEnd')}: {new Date(status.scheduledEnd).toLocaleString(lang === 'fr' ? 'fr-FR' : 'en-US')}</div>}
           </div>
@@ -292,7 +295,7 @@ export const MaintenanceDashboard: React.FC = () => {
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem' }}>{dt(lang, 'showPreview')}</h2>
           <div style={{ borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid rgba(128,128,128,0.2)', height: '500px' }}>
-            <iframe src="/maintenance?preview=true" style={{ width: '100%', height: '100%', border: 'none' }} title="Preview" />
+            <iframe src="/api/maintenance/page?preview=true" style={{ width: '100%', height: '100%', border: 'none' }} title="Preview" />
           </div>
         </div>
       )}

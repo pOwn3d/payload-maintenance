@@ -97,6 +97,9 @@ export interface MaintenancePluginConfig {
 
   /** Slug for the webhook logs collection (default: 'maintenance-webhook-logs') */
   webhookLogsSlug?: string
+
+  /** Show maintenance toggle on the main admin dashboard (default: true) */
+  showDashboardToggle?: boolean
 }
 
 export interface MaintenanceStatus {

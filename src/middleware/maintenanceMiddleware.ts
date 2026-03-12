@@ -154,9 +154,16 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
       return null
     }
 
-    // Never block the maintenance page endpoint itself
-    if (pathname === '/maintenance' || pathname === maintenancePagePath) {
+    // Never block the maintenance page API endpoint itself
+    if (pathname === maintenancePagePath) {
       return null
+    }
+
+    // Rewrite /maintenance to the API endpoint (so preview iframe and direct access work)
+    if (pathname === '/maintenance') {
+      const url = new URL(maintenancePagePath, request.nextUrl.origin)
+      url.search = request.nextUrl.search // forward ?preview=true etc.
+      return NextResponse.rewrite(url)
     }
 
     const origin = config.apiUrl || request.nextUrl.origin

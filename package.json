@@ -1,6 +1,6 @@
 {
   "name": "@consilioweb/payload-maintenance",
-  "version": "0.2.0",
+  "version": "0.3.1",
   "description": "Payload CMS plugin — customizable maintenance mode page with i18n support",
   "type": "module",
   "main": "./dist/index.cjs",

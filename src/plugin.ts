@@ -193,14 +193,24 @@ export const maintenancePlugin =
       }
     }
 
-    // 6. Inject beforeDashboard toggle widget
     if (!config.admin) config.admin = {}
     if (!config.admin.components) config.admin.components = {}
 
-    const existingBeforeDashboard = config.admin.components.beforeDashboard || []
-    config.admin.components.beforeDashboard = [
-      '@consilioweb/payload-maintenance/client#MaintenanceToggle',
-      ...(Array.isArray(existingBeforeDashboard) ? existingBeforeDashboard : [existingBeforeDashboard]),
+    // 6. Inject beforeDashboard toggle widget (configurable via showDashboardToggle)
+    const showDashboardToggle = pluginConfig.showDashboardToggle !== false
+    if (showDashboardToggle) {
+      const existingBeforeDashboard = config.admin.components.beforeDashboard || []
+      config.admin.components.beforeDashboard = [
+        '@consilioweb/payload-maintenance/client#MaintenanceToggle',
+        ...(Array.isArray(existingBeforeDashboard) ? existingBeforeDashboard : [existingBeforeDashboard]),
+      ]
+    }
+
+    // 7. Inject sidebar nav group with icons (afterNavLinks)
+    const navLinks = config.admin.components.afterNavLinks || []
+    config.admin.components.afterNavLinks = [
+      ...(Array.isArray(navLinks) ? navLinks : [navLinks]),
+      '@consilioweb/payload-maintenance/client#MaintenanceNavLink',
     ]
 
     return config

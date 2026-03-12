@@ -2,6 +2,19 @@ import type { PayloadHandler } from 'payload'
 import crypto from 'crypto'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 
+/**
+ * Get current time in a given IANA timezone for schedule comparison.
+ */
+function getNowInTimezone(timezone: string | null | undefined): Date {
+  if (!timezone) return new Date()
+  try {
+    const nowStr = new Date().toLocaleString('en-US', { timeZone: timezone })
+    return new Date(nowStr)
+  } catch {
+    return new Date()
+  }
+}
+
 function resolveMediaUrl(media: any): string | null {
   if (!media) return null
   if (typeof media === 'string') return media
@@ -35,6 +48,42 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
         depth: 1,
       })
 
+      // Inline schedule check — auto-correct the global if schedule says so
+      let enabled = Boolean(maintenance.enabled)
+      const now = getNowInTimezone(maintenance.timezone as string | null | undefined)
+
+      if (
+        maintenance.autoEnable &&
+        maintenance.scheduledStart &&
+        !enabled
+      ) {
+        const start = new Date(maintenance.scheduledStart as string)
+        if (now >= start) {
+          enabled = true
+          req.payload.updateGlobal({
+            slug: globalSlug,
+            data: { enabled: true },
+            overrideAccess: true,
+          }).catch(() => {})
+        }
+      }
+
+      if (
+        maintenance.autoDisable &&
+        maintenance.scheduledEnd &&
+        enabled
+      ) {
+        const end = new Date(maintenance.scheduledEnd as string)
+        if (now >= end) {
+          enabled = false
+          req.payload.updateGlobal({
+            slug: globalSlug,
+            data: { enabled: false },
+            overrideAccess: true,
+          }).catch(() => {})
+        }
+      }
+
       const allowedIPsRaw = (maintenance.allowedIPs as string) || ''
       const allowedIPs = allowedIPsRaw
         .split('\n')
@@ -48,7 +97,7 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
         .filter(Boolean)
 
       return Response.json({
-        enabled: Boolean(maintenance.enabled),
+        enabled,
         template: maintenance.template || 'minimal',
         maintenanceType: maintenance.maintenanceType || 'maintenance',
         messages: maintenance.messages || [],
@@ -85,6 +134,8 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
         scheduledStart: maintenance.scheduledStart || null,
         scheduledEnd: maintenance.scheduledEnd || null,
         timezone: maintenance.timezone || null,
+        // Admin UI
+        showDashboardToggle: maintenance.showDashboardToggle !== false,
       })
     } catch (error) {
       return Response.json({
