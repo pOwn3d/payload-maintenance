@@ -39,7 +39,6 @@ interface MaintenanceData {
   showNewsletterForm?: boolean
   newsletterPlaceholder?: string
   newsletterButtonLabel?: string
-  // New features
   darkMode?: 'auto' | 'light' | 'dark'
   googleFont?: string | null
   lottieUrl?: string | null

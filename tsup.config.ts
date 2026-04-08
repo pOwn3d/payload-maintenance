@@ -51,7 +51,6 @@ export default defineConfig([
         const content = readFileSync(file, 'utf-8')
         writeFileSync(file, CLIENT_BANNER + content)
       }
-      console.log('Prepended "use client" to client bundles')
     },
   },
   // Views entry — server components with DefaultTemplate

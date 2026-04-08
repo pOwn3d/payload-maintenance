@@ -176,5 +176,3 @@ export function MaintenanceNavLink() {
     </div>
   )
 }
-
-export default MaintenanceNavLink

@@ -488,6 +488,17 @@ DROP TABLE IF EXISTS "maintenance-history";
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
+## Roadmap
+
+- Email notifications to subscribers when maintenance starts/ends
+- Cron-based scheduled maintenance (independent of page visits)
+- CIDR range support for IP whitelisting (e.g. 192.168.1.0/24)
+- Maintenance page template editor (WYSIWYG in admin)
+- Multi-language maintenance pages
+- Automatic analytics cleanup (configurable retention period)
+- Slack / Discord webhook notifications
+- Estimated time remaining countdown
+
 ## ☕ Support
 
 If this plugin saves you time, consider buying me a coffee!

@@ -130,7 +130,6 @@ export interface MaintenanceStatus {
   showProgressBar?: boolean
   customHTML?: string | null
   favicon?: string | null
-  // New features
   darkMode?: 'auto' | 'light' | 'dark'
   googleFont?: string | null
   lottieUrl?: string | null

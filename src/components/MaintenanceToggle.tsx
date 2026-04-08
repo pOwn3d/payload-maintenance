@@ -58,7 +58,7 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
       const data = await res.json()
       setEnabled(Boolean(data.enabled))
     } catch {
-      // Silently fail
+      // noop
     } finally {
       setLoading(false)
     }

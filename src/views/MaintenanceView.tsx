@@ -29,5 +29,3 @@ export const MaintenanceView: React.FC<AdminViewServerProps> = (props) => {
     </DefaultTemplate>
   )
 }
-
-export default MaintenanceView
