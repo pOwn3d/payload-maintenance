@@ -17,6 +17,7 @@ export {
   createUnsubscribeHandler,
 } from './endpoints/status.js'
 export { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
+export { getNowInTimezone } from './utils/timezone.js'
 export { createPresetsListHandler, createApplyPresetHandler } from './endpoints/presets.js'
 export { createMaintenancePageHandler } from './endpoints/page.js'
 export { presets, getPreset, presetToPayloadData } from './presets/index.js'

@@ -5,6 +5,35 @@ All notable changes to `@consilioweb/payload-maintenance` will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-04-08
+
+### Added
+- `trustProxy` option to control IP source (x-forwarded-for vs direct)
+- `getNowInTimezone` utility (deduplicated from 2 locations)
+- `checkScheduleState` utility (deduplicated from 3 locations)
+- Analytics pagination with `since` parameter
+- Export CSV with proper pagination (replaces limit:10000)
+- Schedule-check race condition guard
+- Timezone validation (IANA format)
+- Schedule cross-field validation (end must be after start)
+- Custom CSS validation (rejects script/iframe injection)
+- Bypass cookie with `path: '/'`
+- NavLink uses dynamic slugs from config endpoint
+- Dashboard uses dynamic API base path
+- Preset ID validation against whitelist
+- Unsubscribe handler rate limiting + UUID validation
+- Auth token JWT validation via /api/users/me (cached 15s)
+
+### Changed
+- GET /status no longer has side-effects (schedule auto-toggle moved to POST schedule-check)
+- bypassSecret and allowedIPs removed from public response
+- Rate limiter timer uses .unref()
+- Catch blocks in dashboard log warnings
+
+### Security
+- Bypass secret no longer exposed in public API
+- Auth cookie validated via JWT, not just presence check
+
 ## [0.3.1] - 2026-03-12
 
 ### Fixed
@@ -72,6 +101,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `createMaintenanceMiddleware()` for Next.js middleware integration
 - TypeScript strict mode, full type exports
 
+[0.5.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.3.1...v0.5.0
 [0.3.1]: https://github.com/pOwn3d/payload-maintenance/compare/v0.3.0...v0.3.1
 [0.3.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.1.1...v0.2.0

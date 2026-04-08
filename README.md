@@ -18,7 +18,30 @@
 
 </div>
 
+<p align="center">
+  <a href="https://buymeacoffee.com/pown3d">
+    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" />
+  </a>
+</p>
+
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+> [!IMPORTANT]
+> ## ⚠️ Next.js 16 + Turbopack — Known Issue
+>
+> If you're using **Next.js 16** with Turbopack (default bundler), you may encounter a `createContext is not a function` error during `next build`. This is a **known Payload CMS issue** ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)) — not specific to this plugin.
+>
+> **Workaround** — Add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
+> ```ts
+> export const dynamic = 'force-dynamic'
+> ```
+>
+> And ensure all `@consilioweb/*` packages are in `transpilePackages` in your `next.config.ts`:
+> ```ts
+> transpilePackages: ['@consilioweb/seo-analyzer', '@consilioweb/admin-nav', /* ...other @consilioweb packages */],
+> ```
+>
+> ✅ **Next.js 15** works without any workaround.
 
 ## About
 
@@ -157,8 +180,12 @@ Pre-configured templates with colors, fonts, and messages — apply in one click
 
 - **Rate limiting** on all public endpoints (status: 60/min, newsletter: 5/min, track: 30/min per IP)
 - **Auth check** on all admin endpoints (toggle, stats, export, analytics, schedule-check, presets apply)
+- **JWT validation** — auth cookie verified via /api/users/me (cached 15s) (v0.5.0)
 - **Email validation** with regex on newsletter signup
 - **Webhook retry** with exponential backoff (3 attempts: 1s, 2s, 4s)
+- **trustProxy option** — control IP source for rate limiting behind reverse proxies (v0.5.0)
+- **Bypass secret protection** — no longer exposed in public API responses (v0.5.0)
+- **Input validation** — timezone (IANA), schedule cross-field (end > start), custom CSS (no script/iframe), preset ID whitelist, UUID validation on unsubscribe (v0.5.0)
 
 ### Audit History
 
@@ -310,7 +337,8 @@ That's it! The plugin automatically adds:
 | `enableAnalytics` | `boolean` | `true` | Activer le suivi analytique des pages vues pendant la maintenance |
 | `analyticsSlug` | `string` | `'maintenance-analytics'` | Slug de la collection analytique |
 | `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug de la collection de logs webhook |
-| `showDashboardToggle` | `boolean` | `true` | Afficher le toggle maintenance sur le dashboard admin principal |
+| `showDashboardToggle` | `boolean` | `true` | Show maintenance toggle on the main admin dashboard |
+| `trustProxy` | `boolean` | `false` | Trust x-forwarded-for header for IP resolution (set `true` behind reverse proxy) |
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
@@ -339,7 +367,7 @@ That's it! The plugin automatically adds:
 | `GET` | `/api/maintenance/subscribers/export` | Admin | CSV export |
 | `GET` | `/api/maintenance/presets` | Public | List available presets |
 | `POST` | `/api/maintenance/presets/apply` | Admin | Apply a preset |
-| `GET` | `/api/maintenance/schedule-check` | Admin | Check scheduled dates |
+| `POST` | `/api/maintenance/schedule-check` | Admin | Check and apply scheduled dates (v0.5.0: moved from GET to POST) |
 | `GET` | `/api/maintenance/page` | Public | Standalone HTML maintenance page |
 | `POST` | `/api/maintenance/track` | Public | Analytics page view tracking |
 | `GET` | `/api/maintenance/analytics` | Admin | Analytics data |
@@ -459,6 +487,14 @@ DROP TABLE IF EXISTS "maintenance-history";
 ```
 
 <img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+
+## ☕ Support
+
+If this plugin saves you time, consider buying me a coffee!
+
+<a href="https://buymeacoffee.com/pown3d">
+  <img src="https://img.buymeacoffee.com/button-api/?text=Buy me a coffee&emoji=☕&slug=pown3d&button_colour=FFDD00&font_colour=000000&font_family=Cookie&outline_colour=000000&coffee_colour=ffffff" />
+</a>
 
 ## License
 

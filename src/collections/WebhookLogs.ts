@@ -8,7 +8,7 @@ export function createWebhookLogsCollection(slug: string = 'maintenance-webhook-
       plural: { en: 'Webhook Logs', fr: 'Logs Webhook' },
     },
     admin: {
-      hidden: true,
+      custom: { navHidden: true },
       group: { en: 'Settings', fr: 'Parametres' },
       defaultColumns: ['webhookUrl', 'webhookType', 'action', 'status', 'timestamp'],
     },

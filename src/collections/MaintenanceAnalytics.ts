@@ -8,7 +8,7 @@ export function createAnalyticsCollection(slug: string = 'maintenance-analytics'
       plural: { en: 'Maintenance Analytics', fr: 'Analytiques Maintenance' },
     },
     admin: {
-      hidden: true,
+      custom: { navHidden: true },
       group: { en: 'Settings', fr: 'Parametres' },
       defaultColumns: ['path', 'ip', 'timestamp'],
     },

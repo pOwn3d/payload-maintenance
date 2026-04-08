@@ -34,6 +34,7 @@ import {
   createTrackViewHandler,
   createAnalyticsHandler,
   createUnsubscribeHandler,
+  createConfigHandler,
 } from './endpoints/status.js'
 import { createMaintenancePageHandler } from './endpoints/page.js'
 import { createPresetsListHandler, createApplyPresetHandler } from './endpoints/presets.js'
@@ -103,7 +104,7 @@ export const maintenancePlugin =
       {
         path: `${basePath}/status`,
         method: 'get' as const,
-        handler: createStatusHandler(globalSlug),
+        handler: createStatusHandler(globalSlug, pluginConfig.trustProxy),
       },
       {
         path: `${basePath}/toggle`,
@@ -155,10 +156,22 @@ export const maintenancePlugin =
     if (enableScheduling) {
       config.endpoints.push({
         path: `${basePath}/schedule-check`,
-        method: 'get' as const,
+        method: 'post' as const,
         handler: createScheduleCheckHandler(globalSlug),
       })
     }
+
+    // Plugin config endpoint (used by NavLink and Dashboard components)
+    config.endpoints.push({
+      path: `${basePath}/config`,
+      method: 'get' as const,
+      handler: createConfigHandler({
+        globalSlug,
+        subscribersSlug,
+        historySlug,
+        basePath,
+      }),
+    })
 
     // Standalone HTML maintenance page
     config.endpoints.push({

@@ -1,4 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
+import { checkScheduleState } from '../utils/schedule.js'
 
 export interface MaintenanceMiddlewareConfig {
   /** Base URL of the Payload API (default: same origin) */
@@ -27,14 +28,25 @@ export interface MaintenanceMiddlewareConfig {
 
   /** Return HTTP 503 status instead of 200 for SEO (default: true) */
   return503?: boolean
+
+  /** Bypass secret — when provided, visitors can add ?bypass=SECRET to get a 24h bypass cookie.
+   *  This is configured server-side and never exposed via the public status API. */
+  bypassSecret?: string
+
+  /** Allowed IPs that bypass maintenance mode.
+   *  Configured server-side and never exposed via the public status API. */
+  allowedIPs?: string[]
+
+  /** Trust proxy headers for IP detection (default: true).
+   *  Set to false when not behind a trusted reverse proxy. */
+  trustProxy?: boolean
 }
 
 interface CachedStatus {
   enabled: boolean
-  bypassSecret: string | null
-  allowedIPs: string[]
   excludedRoutes: string[]
   authBypass: boolean
+  isAuthenticated: boolean
   estimatedEnd: string | null
   timestamp: number
 }
@@ -57,15 +69,21 @@ async function fetchMaintenanceStatus(
     } as RequestInit)
     const data = await res.json()
 
-    // Check scheduled maintenance inline
-    const scheduledEnabled = checkSchedule(data)
+    // Check scheduled maintenance inline using shared utility
+    const scheduledOverride = checkScheduleState({
+      enabled: Boolean(data.enabled),
+      scheduledStart: data.scheduledStart,
+      scheduledEnd: data.scheduledEnd,
+      autoEnable: data.autoEnable,
+      autoDisable: data.autoDisable,
+      timezone: data.timezone,
+    })
 
     cachedStatus = {
-      enabled: scheduledEnabled ?? Boolean(data.enabled),
-      bypassSecret: data.bypassSecret || null,
-      allowedIPs: data.allowedIPs || [],
+      enabled: scheduledOverride ?? Boolean(data.enabled),
       excludedRoutes: data.excludedRoutes || [],
       authBypass: data.authBypass !== false,
+      isAuthenticated: Boolean(data.isAuthenticated),
       estimatedEnd: data.estimatedEnd || null,
       timestamp: now,
     }
@@ -73,10 +91,9 @@ async function fetchMaintenanceStatus(
   } catch {
     return {
       enabled: false,
-      bypassSecret: null,
-      allowedIPs: [],
       excludedRoutes: [],
       authBypass: true,
+      isAuthenticated: false,
       estimatedEnd: null,
       timestamp: now,
     }
@@ -84,36 +101,34 @@ async function fetchMaintenanceStatus(
 }
 
 /**
- * Get current time in a given IANA timezone for comparison.
- * Returns a Date-like timestamp adjusted so that simple comparisons
- * with schedule dates (stored as local times) work correctly.
+ * Validate a Payload auth token by calling /api/users/me.
+ * Results are cached for 15 seconds to avoid excessive requests.
  */
-function getNowInTimezone(timezone: string | null | undefined): Date {
-  if (!timezone) return new Date()
+const authTokenCache = new Map<string, { valid: boolean; expiresAt: number }>()
+
+async function validateAuthToken(origin: string, token: string): Promise<boolean> {
+  const now = Date.now()
+  const cached = authTokenCache.get(token)
+  if (cached && now < cached.expiresAt) {
+    return cached.valid
+  }
+
   try {
-    // Format current UTC time in the target timezone, then parse it back
-    const nowStr = new Date().toLocaleString('en-US', { timeZone: timezone })
-    return new Date(nowStr)
+    const meRes = await fetch(`${origin}/api/users/me`, {
+      headers: { Cookie: `payload-token=${token}` },
+      cache: 'no-store',
+    } as RequestInit)
+    if (meRes.ok) {
+      const meData = await meRes.json()
+      const valid = Boolean(meData?.user)
+      authTokenCache.set(token, { valid, expiresAt: now + 15_000 })
+      return valid
+    }
   } catch {
-    // Invalid timezone — fall back to UTC
-    return new Date()
+    // Network error — don't cache failure, be permissive
   }
-}
-
-function checkSchedule(data: any): boolean | null {
-  const now = getNowInTimezone(data.timezone)
-
-  if (data.scheduledStart && data.autoEnable && !data.enabled) {
-    const start = new Date(data.scheduledStart)
-    if (now >= start) return true
-  }
-
-  if (data.scheduledEnd && data.autoDisable && data.enabled) {
-    const end = new Date(data.scheduledEnd)
-    if (now >= end) return false
-  }
-
-  return null
+  authTokenCache.set(token, { valid: false, expiresAt: now + 15_000 })
+  return false
 }
 
 /**
@@ -136,6 +151,9 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
   const enableAuthBypass = config.authBypass !== false
   const authCookieName = config.authCookieName ?? 'payload-token'
   const return503 = config.return503 !== false
+  const bypassSecret = config.bypassSecret || null
+  const allowedIPs = config.allowedIPs || []
+  const trustProxy = config.trustProxy !== false
 
   return async (request: NextRequest): Promise<NextResponse | null> => {
     const { pathname } = request.nextUrl
@@ -171,38 +189,49 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
 
     if (!status.enabled) return null
 
-    // Auth bypass: logged-in Payload users see real site
+    // Auth bypass: validate token against Payload /api/users/me with caching
     if (enableAuthBypass && status.authBypass) {
       const authCookie = request.cookies.get(authCookieName)
-      if (authCookie?.value) return null
+      if (authCookie?.value) {
+        const isValid = await validateAuthToken(origin, authCookie.value)
+        if (isValid) return null
+      }
     }
 
     // Check bypass cookie
     const bypassCookie = request.cookies.get(bypassCookieName)
     if (bypassCookie?.value === 'true') return null
 
-    // Check bypass secret in query params
-    if (status.bypassSecret) {
+    // Check bypass secret in query params (secret is configured server-side, never exposed via API)
+    if (bypassSecret) {
       const bypassParam = request.nextUrl.searchParams.get('bypass')
-      if (bypassParam === status.bypassSecret) {
+      if (bypassParam === bypassSecret) {
         const response = NextResponse.redirect(request.nextUrl.origin + pathname)
         response.cookies.set(bypassCookieName, 'true', {
           httpOnly: true,
           secure: true,
           sameSite: 'lax',
+          path: '/',
           maxAge: 60 * 60 * 24, // 24h
         })
         return response
       }
     }
 
-    // Check allowed IPs
-    const clientIP =
-      request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      request.headers.get('x-real-ip') ||
-      ''
-    if (clientIP && status.allowedIPs.includes(clientIP)) {
-      return null
+    // Check allowed IPs (configured server-side, never exposed via API)
+    if (allowedIPs.length > 0) {
+      let clientIP: string
+      if (trustProxy) {
+        clientIP =
+          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+          request.headers.get('x-real-ip') ||
+          ''
+      } else {
+        clientIP = (request as any).ip || ''
+      }
+      if (clientIP && allowedIPs.includes(clientIP)) {
+        return null
+      }
     }
 
     // Check excluded routes

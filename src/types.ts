@@ -100,6 +100,10 @@ export interface MaintenancePluginConfig {
 
   /** Show maintenance toggle on the main admin dashboard (default: true) */
   showDashboardToggle?: boolean
+
+  /** Trust proxy headers (x-forwarded-for, x-real-ip) for IP detection (default: true).
+   *  Set to false when not behind a trusted reverse proxy to prevent IP spoofing. */
+  trustProxy?: boolean
 }
 
 export interface MaintenanceStatus {
@@ -108,8 +112,7 @@ export interface MaintenanceStatus {
   maintenanceType?: MaintenanceType
   messages: MaintenanceMessage[]
   estimatedEnd?: string | null
-  allowedIPs?: string[]
-  bypassSecret?: string | null
+  isAuthenticated?: boolean
   excludedPaths?: string[]
   logoUrl?: string | null
   backgroundImageUrl?: string | null

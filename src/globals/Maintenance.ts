@@ -83,7 +83,7 @@ export function createMaintenanceGlobal(
       ],
     },
     admin: {
-      hidden: true,
+      custom: { navHidden: true },
     },
     fields: [
       // ─── Activation ───
@@ -412,6 +412,17 @@ export function createMaintenanceGlobal(
                 type: 'code',
                 label: { en: 'Custom CSS', fr: 'CSS personnalise' },
                 admin: { language: 'css' },
+                validate: (value: string | null | undefined) => {
+                  if (!value) return true
+                  // Reject HTML tags that could escape the <style> context
+                  const dangerousPatterns = [/<\/style/i, /<script/i, /<iframe/i, /<object/i, /<embed/i, /<link/i, /<import/i]
+                  for (const pattern of dangerousPatterns) {
+                    if (pattern.test(value)) {
+                      return 'CSS must not contain HTML tags (</style>, <script>, etc.)'
+                    }
+                  }
+                  return true
+                },
               },
               {
                 name: 'customHTML',
@@ -421,8 +432,8 @@ export function createMaintenanceGlobal(
                   language: 'html',
                   condition: (_: any, siblingData: any) => siblingData?.template === 'custom',
                   description: {
-                    en: 'Variables: {{title}}, {{description}}, {{estimatedEnd}}, {{logoUrl}}',
-                    fr: 'Variables : {{title}}, {{description}}, {{estimatedEnd}}, {{logoUrl}}',
+                    en: '⚠️ WARNING: This HTML is injected as-is. Only trusted admins should edit this field. Avoid pasting untrusted content.\nVariables: {{title}}, {{description}}, {{estimatedEnd}}, {{logoUrl}}',
+                    fr: '⚠️ ATTENTION : Ce HTML est injecte tel quel. Seuls les admins de confiance doivent modifier ce champ. Ne pas coller de contenu non verifie.\nVariables : {{title}}, {{description}}, {{estimatedEnd}}, {{logoUrl}}',
                   },
                 },
               },
@@ -530,6 +541,17 @@ export function createMaintenanceGlobal(
                           name: 'scheduledEnd',
                           type: 'date' as const,
                           label: { en: 'Scheduled end', fr: 'Fin planifiee' },
+                          validate: (value: Date | string | null | undefined, { siblingData }: any) => {
+                            if (!value || !siblingData?.scheduledStart) return true
+                            const endDate = value instanceof Date ? value : new Date(value)
+                            const startDate = siblingData.scheduledStart instanceof Date
+                              ? siblingData.scheduledStart
+                              : new Date(siblingData.scheduledStart)
+                            if (endDate <= startDate) {
+                              return 'End date must be after start date'
+                            }
+                            return true
+                          },
                           admin: {
                             width: '50%',
                             date: { pickerAppearance: 'dayAndTime' as const },
@@ -545,6 +567,15 @@ export function createMaintenanceGlobal(
                       name: 'timezone',
                       type: 'text' as const,
                       label: { en: 'Timezone', fr: 'Fuseau horaire' },
+                      validate: (value: string | null | undefined) => {
+                        if (!value) return true
+                        try {
+                          Intl.DateTimeFormat(undefined, { timeZone: value })
+                          return true
+                        } catch {
+                          return 'Invalid timezone. Use IANA format (e.g. Europe/Paris)'
+                        }
+                      },
                       admin: {
                         placeholder: 'Europe/Paris',
                         description: {

@@ -32,14 +32,26 @@ export function createApplyPresetHandler(globalSlug: string): PayloadHandler {
       const presetId = body?.presetId
       const languages = body?.languages || ['fr', 'en']
 
-      if (!presetId) {
+      if (!presetId || typeof presetId !== 'string') {
         return Response.json({ error: 'Missing presetId' }, { status: 400 })
       }
 
-      const preset = getPreset(presetId)
-      if (!preset) {
-        return Response.json({ error: `Preset "${presetId}" not found` }, { status: 404 })
+      // Validate presetId format: only alphanumeric, hyphens, underscores (max 64 chars)
+      if (!/^[a-zA-Z0-9_-]{1,64}$/.test(presetId)) {
+        return Response.json({ error: 'Invalid presetId format' }, { status: 400 })
       }
+
+      // Validate presetId exists in the known preset list
+      const validIds = presets.map((p) => p.id)
+      if (!validIds.includes(presetId)) {
+        return Response.json(
+          { error: `Unknown presetId "${presetId}". Valid presets: ${validIds.join(', ')}` },
+          { status: 400 },
+        )
+      }
+
+      const preset = getPreset(presetId)!
+
 
       const data = presetToPayloadData(preset, languages)
 

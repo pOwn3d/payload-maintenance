@@ -1,19 +1,7 @@
 import type { PayloadHandler } from 'payload'
 import crypto from 'crypto'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
-
-/**
- * Get current time in a given IANA timezone for schedule comparison.
- */
-function getNowInTimezone(timezone: string | null | undefined): Date {
-  if (!timezone) return new Date()
-  try {
-    const nowStr = new Date().toLocaleString('en-US', { timeZone: timezone })
-    return new Date(nowStr)
-  } catch {
-    return new Date()
-  }
-}
+import { getEffectiveEnabled, checkScheduleState } from '../utils/schedule.js'
 
 function resolveMediaUrl(media: any): string | null {
   if (!media) return null
@@ -22,22 +10,30 @@ function resolveMediaUrl(media: any): string | null {
 }
 
 /** Extract client IP from request headers */
-function getClientIP(req: any): string {
-  return (
-    req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-    req.headers.get('x-real-ip') ||
-    'unknown'
-  )
+function getClientIP(req: any, trustProxy: boolean = true): string {
+  if (trustProxy) {
+    return (
+      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+      req.headers.get('x-real-ip') ||
+      req.ip ||
+      'unknown'
+    )
+  }
+  // When trustProxy is false, only use direct connection IP
+  return req.ip || 'unknown'
 }
 
 /**
- * Public endpoint to check maintenance status.
+ * Public endpoint to check maintenance status (read-only, no side-effects).
  * Used by the Next.js middleware and the MaintenancePage component.
+ *
+ * Schedule-based auto-toggle has been moved to the POST schedule-check endpoint
+ * to avoid side-effects in a GET handler.
  */
-export function createStatusHandler(globalSlug: string): PayloadHandler {
+export function createStatusHandler(globalSlug: string, trustProxy: boolean = true): PayloadHandler {
   return async (req) => {
     // Rate limit: 60 requests per minute per IP
-    const ip = getClientIP(req)
+    const ip = getClientIP(req, trustProxy)
     const { allowed, retryAfter } = rateLimit(`status:${ip}`, 60, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
 
@@ -48,47 +44,15 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
         depth: 1,
       })
 
-      // Inline schedule check — auto-correct the global if schedule says so
-      let enabled = Boolean(maintenance.enabled)
-      const now = getNowInTimezone(maintenance.timezone as string | null | undefined)
-
-      if (
-        maintenance.autoEnable &&
-        maintenance.scheduledStart &&
-        !enabled
-      ) {
-        const start = new Date(maintenance.scheduledStart as string)
-        if (now >= start) {
-          enabled = true
-          req.payload.updateGlobal({
-            slug: globalSlug,
-            data: { enabled: true },
-            overrideAccess: true,
-          }).catch(() => {})
-        }
-      }
-
-      if (
-        maintenance.autoDisable &&
-        maintenance.scheduledEnd &&
-        enabled
-      ) {
-        const end = new Date(maintenance.scheduledEnd as string)
-        if (now >= end) {
-          enabled = false
-          req.payload.updateGlobal({
-            slug: globalSlug,
-            data: { enabled: false },
-            overrideAccess: true,
-          }).catch(() => {})
-        }
-      }
-
-      const allowedIPsRaw = (maintenance.allowedIPs as string) || ''
-      const allowedIPs = allowedIPsRaw
-        .split('\n')
-        .map((ip: string) => ip.trim())
-        .filter(Boolean)
+      // Read-only schedule check — compute effective state without mutating global
+      const enabled = getEffectiveEnabled({
+        enabled: Boolean(maintenance.enabled),
+        scheduledStart: maintenance.scheduledStart as string | null,
+        scheduledEnd: maintenance.scheduledEnd as string | null,
+        autoEnable: Boolean(maintenance.autoEnable),
+        autoDisable: Boolean(maintenance.autoDisable),
+        timezone: maintenance.timezone as string | null,
+      })
 
       const excludedRoutesRaw = (maintenance.excludedRoutes as string) || ''
       const excludedRoutes = excludedRoutesRaw
@@ -98,12 +62,11 @@ export function createStatusHandler(globalSlug: string): PayloadHandler {
 
       return Response.json({
         enabled,
+        isAuthenticated: Boolean(req.user),
         template: maintenance.template || 'minimal',
         maintenanceType: maintenance.maintenanceType || 'maintenance',
         messages: maintenance.messages || [],
         estimatedEnd: maintenance.estimatedEnd || null,
-        allowedIPs,
-        bypassSecret: maintenance.bypassSecret || null,
         excludedPaths: ['/admin', '/api'],
         excludedRoutes,
         authBypass: maintenance.authBypass !== false,
@@ -263,14 +226,24 @@ export function createSubscribersExportHandler(
     }
 
     try {
-      const subscribers = await req.payload.find({
-        collection: subscribersSlug as any,
-        limit: 10000,
-        sort: '-subscribedAt',
-      })
+      // Paginated fetch to collect all subscribers without arbitrary limit
+      const allDocs: any[] = []
+      let page = 1
+      while (true) {
+        const result = await req.payload.find({
+          collection: subscribersSlug as any,
+          limit: 500,
+          page,
+          sort: '-subscribedAt',
+        })
+        allDocs.push(...result.docs)
+        if (!result.hasNextPage) break
+        page++
+        if (page > 100) break // safety limit
+      }
 
       const csvHeader = '\uFEFFemail,language,subscribedAt,ip\n'
-      const csvRows = subscribers.docs
+      const csvRows = allDocs
         .map((s: any) => `${s.email},${s.language || ''},${s.subscribedAt || ''},${s.ip || ''}`)
         .join('\n')
 
@@ -373,11 +346,22 @@ export function createAnalyticsHandler(analyticsSlug: string = 'maintenance-anal
     }
 
     try {
-      // Fetch all views
+      // Parse optional `since` query parameter (ISO date) to limit the period
+      const url = new URL(req.url || '', 'http://localhost')
+      const sinceParam = url.searchParams.get('since')
+      const page = Math.max(1, parseInt(url.searchParams.get('page') || '1', 10))
+
+      const where: Record<string, any> = {}
+      if (sinceParam) {
+        where.timestamp = { greater_than: sinceParam }
+      }
+
       const allViews = await req.payload.find({
         collection: analyticsSlug as any,
-        limit: 10000,
+        limit: 1000,
+        page,
         sort: '-timestamp',
+        where,
       })
 
       const docs = allViews.docs as any[]
@@ -427,12 +411,20 @@ export function createAnalyticsHandler(analyticsSlug: string = 'maintenance-anal
         topPaths,
         viewsByHour,
         topReferers,
+        pagination: {
+          page,
+          totalPages: allViews.totalPages,
+          hasNextPage: allViews.hasNextPage,
+        },
       })
     } catch (error) {
       return Response.json({ error: 'Failed to fetch analytics' }, { status: 500 })
     }
   }
 }
+
+/** Module-level flag to prevent concurrent schedule check updates */
+let scheduleCheckInProgress = false
 
 /**
  * Check scheduled maintenance and auto-toggle if needed (admin only).
@@ -444,41 +436,29 @@ export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
       return Response.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
+    if (scheduleCheckInProgress) {
+      return Response.json({ message: 'Check already in progress' })
+    }
+    scheduleCheckInProgress = true
+
     try {
       const maintenance = await req.payload.findGlobal({
         slug: globalSlug,
         overrideAccess: true,
       })
 
-      const now = new Date()
-      let changed = false
-      let newState = Boolean(maintenance.enabled)
+      const currentState = Boolean(maintenance.enabled)
+      const override = checkScheduleState({
+        enabled: currentState,
+        scheduledStart: maintenance.scheduledStart as string | null,
+        scheduledEnd: maintenance.scheduledEnd as string | null,
+        autoEnable: Boolean(maintenance.autoEnable),
+        autoDisable: Boolean(maintenance.autoDisable),
+        timezone: maintenance.timezone as string | null,
+      })
 
-      // Auto-enable
-      if (
-        maintenance.autoEnable &&
-        maintenance.scheduledStart &&
-        !maintenance.enabled
-      ) {
-        const start = new Date(maintenance.scheduledStart as string)
-        if (now >= start) {
-          newState = true
-          changed = true
-        }
-      }
-
-      // Auto-disable
-      if (
-        maintenance.autoDisable &&
-        maintenance.scheduledEnd &&
-        maintenance.enabled
-      ) {
-        const end = new Date(maintenance.scheduledEnd as string)
-        if (now >= end) {
-          newState = false
-          changed = true
-        }
-      }
+      const changed = override !== null
+      const newState = override ?? currentState
 
       if (changed) {
         await req.payload.updateGlobal({
@@ -495,6 +475,8 @@ export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
       })
     } catch (error) {
       return Response.json({ error: 'Schedule check failed' }, { status: 500 })
+    } finally {
+      scheduleCheckInProgress = false
     }
   }
 }
@@ -502,11 +484,21 @@ export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
 /**
  * Unsubscribe handler — removes subscriber by token (public, GET).
  */
-export function createUnsubscribeHandler(subscribersSlug: string): PayloadHandler {
+export function createUnsubscribeHandler(subscribersSlug: string, trustProxy: boolean = true): PayloadHandler {
   return async (req) => {
+    // Rate limit: 10 requests per minute per IP to prevent DB enumeration
+    const ip = getClientIP(req, trustProxy)
+    const { allowed, retryAfter } = rateLimit(`unsubscribe:${ip}`, 10, 60_000)
+    if (!allowed) return rateLimitResponse(retryAfter)
+
     const url = new URL(req.url || '', 'http://localhost')
     const token = url.searchParams.get('token')
     if (!token) return Response.json({ error: 'Missing token' }, { status: 400 })
+
+    // Validate token format (UUID v4) to avoid unnecessary DB queries
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(token)) {
+      return Response.json({ error: 'Invalid token format' }, { status: 400 })
+    }
 
     const result = await req.payload.find({
       collection: subscribersSlug as any,
@@ -528,5 +520,33 @@ export function createUnsubscribeHandler(subscribersSlug: string): PayloadHandle
       '<html><body style="font-family:system-ui;display:flex;align-items:center;justify-content:center;min-height:100vh;background:#0f172a;color:#f8fafc"><div style="text-align:center"><h1>&#10003;</h1><p>You have been unsubscribed.</p></div></body></html>',
       { status: 200, headers: { 'Content-Type': 'text/html' } },
     )
+  }
+}
+
+/**
+ * Return plugin configuration slugs so client components can build
+ * correct links without hardcoding collection/global slugs.
+ */
+export function createConfigHandler(opts: {
+  globalSlug: string
+  subscribersSlug: string
+  historySlug: string
+  basePath: string
+}): PayloadHandler {
+  // Config is static — compute the response once
+  const body = JSON.stringify({
+    globalSlug: opts.globalSlug,
+    subscribersSlug: opts.subscribersSlug,
+    historySlug: opts.historySlug,
+    basePath: opts.basePath,
+  })
+
+  return async () => {
+    return new Response(body, {
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'public, max-age=3600',
+      },
+    })
   }
 }

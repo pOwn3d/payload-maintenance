@@ -105,6 +105,9 @@ function dt(lang: string, key: string): string {
   return dashboardTranslations[lang]?.[key] || dashboardTranslations.en?.[key] || key
 }
 
+/** Default API base path — updated dynamically from /api/maintenance/config */
+const DEFAULT_BASE_PATH = '/api/maintenance'
+
 export const MaintenanceDashboard: React.FC = () => {
   const [status, setStatus] = useState<MaintenanceStatus | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
@@ -114,14 +117,27 @@ export const MaintenanceDashboard: React.FC = () => {
   const [showPreview, setShowPreview] = useState(false)
   const [showPresets, setShowPresets] = useState(false)
   const [presetSuccess, setPresetSuccess] = useState<string | null>(null)
+  const [basePath, setBasePath] = useState(DEFAULT_BASE_PATH)
+  const [globalSlug, setGlobalSlug] = useState('maintenance')
   const lang = useDashboardLang()
+
+  // Fetch plugin config once to get the actual basePath
+  useEffect(() => {
+    fetch(`${DEFAULT_BASE_PATH}/config`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (data?.basePath) setBasePath(`/api${data.basePath}`)
+        if (data?.globalSlug) setGlobalSlug(data.globalSlug)
+      })
+      .catch((err) => console.warn('[maintenance] Failed to fetch config', err))
+  }, [])
 
   const fetchAll = useCallback(async () => {
     try {
       const [statusResult, statsResult, presetsResult] = await Promise.allSettled([
-        fetch('/api/maintenance/status'),
-        fetch('/api/maintenance/stats'),
-        fetch('/api/maintenance/presets'),
+        fetch(`${basePath}/status`),
+        fetch(`${basePath}/stats`),
+        fetch(`${basePath}/presets`),
       ])
       if (statusResult.status === 'fulfilled' && statusResult.value.ok) {
         setStatus(await statusResult.value.json())
@@ -133,25 +149,25 @@ export const MaintenanceDashboard: React.FC = () => {
         const data = await presetsResult.value.json()
         setPresets(data.presets || [])
       }
-    } catch {}
-  }, [])
+    } catch (err) { console.warn('[maintenance] Failed to fetch dashboard data', err) }
+  }, [basePath])
 
   useEffect(() => { fetchAll() }, [fetchAll])
 
   const toggle = useCallback(async () => {
     setLoading(true)
     try {
-      const res = await fetch('/api/maintenance/toggle', { method: 'POST' })
+      const res = await fetch(`${basePath}/toggle`, { method: 'POST' })
       const data = await res.json()
       setStatus((prev) => (prev ? { ...prev, enabled: data.enabled } : null))
       setTimeout(fetchAll, 500)
-    } catch {} finally { setLoading(false) }
-  }, [fetchAll])
+    } catch (err) { console.warn('[maintenance] Toggle failed', err) } finally { setLoading(false) }
+  }, [basePath, fetchAll])
 
   const applyPreset = useCallback(async (presetId: string) => {
     setApplyingPreset(presetId)
     try {
-      const res = await fetch('/api/maintenance/presets/apply', {
+      const res = await fetch(`${basePath}/presets/apply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ presetId }),
@@ -161,8 +177,8 @@ export const MaintenanceDashboard: React.FC = () => {
         setTimeout(() => setPresetSuccess(null), 3000)
         fetchAll()
       }
-    } catch {} finally { setApplyingPreset(null) }
-  }, [fetchAll])
+    } catch (err) { console.warn('[maintenance] Preset apply failed', err) } finally { setApplyingPreset(null) }
+  }, [basePath, fetchAll])
 
   if (!status) return <p>{dt(lang, 'loading')}</p>
 
@@ -277,7 +293,7 @@ export const MaintenanceDashboard: React.FC = () => {
         <div style={{ padding: '1rem 1.25rem', borderRadius: '0.5rem', background: 'var(--theme-elevation-50, rgba(128,128,128,0.04))', border: '1px solid var(--theme-elevation-150, rgba(128,128,128,0.15))' }}>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '0.25rem' }}>
             <span style={{ fontSize: '0.7rem', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em', opacity: 0.5 }}>{dt(lang, 'subscribers')}</span>
-            {stats && stats.subscribersCount > 0 && <a href="/api/maintenance/subscribers/export" style={{ fontSize: '0.65rem', opacity: 0.6, textDecoration: 'underline' }}>CSV</a>}
+            {stats && stats.subscribersCount > 0 && <a href={`${basePath}/subscribers/export`} style={{ fontSize: '0.65rem', opacity: 0.6, textDecoration: 'underline' }}>CSV</a>}
           </div>
           <span style={{ fontSize: '1rem', fontWeight: 600 }}>{stats?.subscribersCount ?? 0}</span>
         </div>
@@ -295,7 +311,7 @@ export const MaintenanceDashboard: React.FC = () => {
         <div style={{ marginBottom: '1.5rem' }}>
           <h2 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: '0.75rem' }}>{dt(lang, 'showPreview')}</h2>
           <div style={{ borderRadius: '0.75rem', overflow: 'hidden', border: '1px solid rgba(128,128,128,0.2)', height: '500px' }}>
-            <iframe src="/api/maintenance/page?preview=true" style={{ width: '100%', height: '100%', border: 'none' }} title="Preview" />
+            <iframe src={`${basePath}/page?preview=true`} style={{ width: '100%', height: '100%', border: 'none' }} title="Preview" />
           </div>
         </div>
       )}
@@ -338,7 +354,7 @@ export const MaintenanceDashboard: React.FC = () => {
       <div style={{ padding: '1rem', borderRadius: '0.5rem', background: 'rgba(59,130,246,0.08)', border: '1px solid rgba(59,130,246,0.2)' }}>
         <p style={{ margin: 0, fontSize: '0.9rem' }}>
           {dt(lang, 'advancedConfig')}{' '}
-          <a href="/admin/globals/maintenance" style={{ color: '#3b82f6', fontWeight: 600 }}>{dt(lang, 'editGlobal')}</a>.
+          <a href={`/admin/globals/${globalSlug}`} style={{ color: '#3b82f6', fontWeight: 600 }}>{dt(lang, 'editGlobal')}</a>.
         </p>
       </div>
     </div>

@@ -2,7 +2,7 @@
 // Matches the SeoNavLink pattern: group title + items with border-left active indicator
 'use client'
 
-import React from 'react'
+import React, { useEffect, useState } from 'react'
 // @ts-ignore — next is a peer dependency
 import { usePathname } from 'next/navigation'
 
@@ -10,6 +10,13 @@ interface NavItem {
   href: string
   label: string
   icon: React.ReactNode
+}
+
+interface PluginConfig {
+  globalSlug: string
+  subscribersSlug: string
+  historySlug: string
+  basePath: string
 }
 
 const svgProps = {
@@ -48,10 +55,34 @@ function useNavLang(): string {
   return lang in translations ? lang : 'en'
 }
 
+// Default slugs used until the config endpoint responds
+const defaultConfig: PluginConfig = {
+  globalSlug: 'maintenance',
+  subscribersSlug: 'maintenance-subscribers',
+  historySlug: 'maintenance-history',
+  basePath: '/maintenance',
+}
+
 export function MaintenanceNavLink() {
   const pathname = usePathname()
   const lang = useNavLang()
   const t = translations[lang] || translations.en
+  const [cfg, setCfg] = useState<PluginConfig>(defaultConfig)
+
+  useEffect(() => {
+    // Fetch actual plugin config so slugs stay in sync with plugin options
+    fetch('/api/maintenance/config')
+      .then((res) => {
+        if (res.ok) return res.json()
+        return null
+      })
+      .then((data) => {
+        if (data) setCfg(data)
+      })
+      .catch((err) => {
+        console.warn('[maintenance] Failed to fetch plugin config for nav', err)
+      })
+  }, [])
 
   const adminPrefix = pathname?.match(/^(\/[^/]+)\//)?.[1] || '/admin'
 
@@ -67,7 +98,7 @@ export function MaintenanceNavLink() {
       ),
     },
     {
-      href: `${adminPrefix}/collections/maintenance-subscribers`,
+      href: `${adminPrefix}/collections/${cfg.subscribersSlug}`,
       label: t.subscribers,
       icon: (
         <svg {...svgProps}>
@@ -79,7 +110,7 @@ export function MaintenanceNavLink() {
       ),
     },
     {
-      href: `${adminPrefix}/collections/maintenance-history`,
+      href: `${adminPrefix}/collections/${cfg.historySlug}`,
       label: t.history,
       icon: (
         <svg {...svgProps}>
@@ -90,7 +121,7 @@ export function MaintenanceNavLink() {
       ),
     },
     {
-      href: `${adminPrefix}/globals/maintenance`,
+      href: `${adminPrefix}/globals/${cfg.globalSlug}`,
       label: t.settings,
       icon: (
         <svg {...svgProps}>
