@@ -875,7 +875,13 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
   // ─── Fetch status and render ───
   fetch(STATUS_URL)
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      // /status now answers 503 when it cannot read the global; fall through to
+      // the catch below so the visitor gets the safe maintenance fallback
+      // instead of a page rendered from an error payload.
+      if (!r.ok) throw new Error('status ' + r.status);
+      return r.json();
+    })
     .then(function(data) {
       // Custom HTML template
       if (data.template === 'custom' && data.customHTML) {

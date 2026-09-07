@@ -26,6 +26,13 @@ export interface MaintenanceMiddlewareConfig {
   /** Payload auth cookie name (default: 'payload-token') */
   authCookieName?: string
 
+  /** Collection queried to validate the auth cookie (default: 'users').
+   *  Must be the collection Payload uses for the admin panel: Payload's
+   *  `/api/<slug>/me` returns `{ user: null }` for a token issued by any other
+   *  auth collection, which is what keeps customer accounts from bypassing
+   *  maintenance mode. */
+  usersCollectionSlug?: string
+
   /** Return HTTP 503 status instead of 200 for SEO (default: true) */
   return503?: boolean
 
@@ -53,6 +60,18 @@ interface CachedStatus {
 
 let cachedStatus: CachedStatus | null = null
 
+/** Last-resort state when the status endpoint has never answered successfully. */
+function coldStartStatus(now: number): CachedStatus {
+  return {
+    enabled: false,
+    excludedRoutes: [],
+    authBypass: true,
+    isAuthenticated: false,
+    estimatedEnd: null,
+    timestamp: now,
+  }
+}
+
 async function fetchMaintenanceStatus(
   origin: string,
   statusEndpoint: string,
@@ -67,7 +86,14 @@ async function fetchMaintenanceStatus(
     const res = await fetch(`${origin}${statusEndpoint}`, {
       cache: 'no-store',
     } as RequestInit)
+    // A non-2xx answer (503 when the database is down, 429 under rate limiting)
+    // still parses as JSON, so an unchecked res.json() used to be read as
+    // "no maintenance" and let all traffic through at the worst moment.
+    if (!res.ok) throw new Error(`status endpoint returned HTTP ${res.status}`)
     const data = await res.json()
+    if (typeof data?.enabled !== 'boolean') {
+      throw new Error('status endpoint returned no boolean "enabled" field')
+    }
 
     // Check scheduled maintenance inline using shared utility
     const scheduledOverride = checkScheduleState({
@@ -88,15 +114,14 @@ async function fetchMaintenanceStatus(
       timestamp: now,
     }
     return cachedStatus
-  } catch {
-    return {
-      enabled: false,
-      excludedRoutes: [],
-      authBypass: true,
-      isAuthenticated: false,
-      estimatedEnd: null,
-      timestamp: now,
-    }
+  } catch (error) {
+    // Keep serving the last known state instead of fabricating a fresh
+    // `enabled: false`, and say so — a silent fail-open here un-publishes the
+    // 503 + X-Robots-Tag and lets crawlers index a broken site.
+    // The stale entry is returned as-is (its timestamp is not refreshed), so the
+    // next request retries the endpoint rather than caching the failure.
+    console.warn(`[maintenance] Status check failed, keeping last known state: ${error}`)
+    return cachedStatus ?? coldStartStatus(now)
   }
 }
 
@@ -106,28 +131,44 @@ async function fetchMaintenanceStatus(
  */
 const authTokenCache = new Map<string, { valid: boolean; expiresAt: number }>()
 
-async function validateAuthToken(origin: string, token: string): Promise<boolean> {
+async function validateAuthToken(
+  origin: string,
+  token: string,
+  usersCollectionSlug: string,
+  authCookieName: string,
+): Promise<boolean> {
   const now = Date.now()
-  const cached = authTokenCache.get(token)
+  const cached = authTokenCache.get(`${usersCollectionSlug}:${token}`)
   if (cached && now < cached.expiresAt) {
     return cached.valid
   }
 
   try {
-    const meRes = await fetch(`${origin}/api/users/me`, {
-      headers: { Cookie: `payload-token=${token}` },
+    // Payload's `me` operation returns `{ user: null }` when the token belongs
+    // to another auth collection, so querying the admin collection here is what
+    // stops a customer/member account from bypassing maintenance mode.
+    // The cookie must be echoed back under its configured name: a host with a
+    // custom cookiePrefix was silently losing the bypass.
+    const meRes = await fetch(`${origin}/api/${usersCollectionSlug}/me`, {
+      headers: { Cookie: `${authCookieName}=${token}` },
       cache: 'no-store',
     } as RequestInit)
     if (meRes.ok) {
       const meData = await meRes.json()
       const valid = Boolean(meData?.user)
-      authTokenCache.set(token, { valid, expiresAt: now + 15_000 })
+      authTokenCache.set(`${usersCollectionSlug}:${token}`, { valid, expiresAt: now + 15_000 })
       return valid
     }
   } catch {
-    // Network error — don't cache failure, be permissive
+    // Network error: deny the bypass for this request, but do NOT cache it.
+    // Caching here pinned the wrong answer for 15s, so one transient blip locked
+    // a signed-in admin out of the site for the whole window. Returning early
+    // lets the very next request retry.
+    return false
   }
-  authTokenCache.set(token, { valid: false, expiresAt: now + 15_000 })
+  // Reached only when Payload answered with a non-ok status (401/403): that is a
+  // real negative and is worth caching.
+  authTokenCache.set(`${usersCollectionSlug}:${token}`, { valid: false, expiresAt: now + 15_000 })
   return false
 }
 
@@ -142,6 +183,20 @@ async function validateAuthToken(origin: string, token: string): Promise<boolean
  * - Bypass cookie + secret
  * - Scheduled maintenance auto-toggle
  */
+/**
+ * Match a pathname against a route prefix on segment boundaries.
+ *
+ * `'/administration'.startsWith('/admin')` is true, which is why a raw prefix
+ * test let unrelated routes escape maintenance mode. A prefix matches only when
+ * the pathname IS that route or continues with `/`.
+ */
+export function matchesPathPrefix(pathname: string, prefix: string): boolean {
+  if (!prefix) return false
+  const normalized = prefix.length > 1 && prefix.endsWith('/') ? prefix.slice(0, -1) : prefix
+  if (normalized === '/') return true
+  return pathname === normalized || pathname.startsWith(`${normalized}/`)
+}
+
 export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig = {}) {
   const excludedPaths = config.excludedPaths ?? ['/admin', '/api']
   const cacheDuration = config.cacheDuration ?? 10
@@ -150,6 +205,7 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
   const maintenancePagePath = config.maintenancePagePath ?? '/api/maintenance/page'
   const enableAuthBypass = config.authBypass !== false
   const authCookieName = config.authCookieName ?? 'payload-token'
+  const usersCollectionSlug = config.usersCollectionSlug ?? 'users'
   const return503 = config.return503 !== false
   const bypassSecret = config.bypassSecret || null
   const allowedIPs = config.allowedIPs || []
@@ -158,8 +214,10 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
   return async (request: NextRequest): Promise<NextResponse | null> => {
     const { pathname } = request.nextUrl
 
-    // Never block excluded paths
-    if (excludedPaths.some((p) => pathname.startsWith(p))) {
+    // Never block excluded paths. Match on segment boundaries, not raw prefix:
+    // a bare `startsWith('/admin')` also excluded `/administration-des-ventes`,
+    // which then stayed online during maintenance.
+    if (excludedPaths.some((p) => matchesPathPrefix(pathname, p))) {
       return null
     }
 
@@ -193,7 +251,12 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
     if (enableAuthBypass && status.authBypass) {
       const authCookie = request.cookies.get(authCookieName)
       if (authCookie?.value) {
-        const isValid = await validateAuthToken(origin, authCookie.value)
+        const isValid = await validateAuthToken(
+          origin,
+          authCookie.value,
+          usersCollectionSlug,
+          authCookieName,
+        )
         if (isValid) return null
       }
     }

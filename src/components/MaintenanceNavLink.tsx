@@ -49,10 +49,31 @@ const translations: Record<string, Record<string, string>> = {
   },
 }
 
+/**
+ * Language for the nav labels.
+ *
+ * Reading navigator.language during render breaks hydration: the server has no
+ * navigator and falls back to 'en' ("Dashboard"), while the client immediately
+ * renders the browser language ("Tableau de bord"). React sees two different
+ * texts for the same node and throws #418 on every page load for any non-English
+ * user.
+ *
+ * Fix: render the SAME thing as the server on first paint, then switch inside an
+ * effect — which only runs once hydration has completed.
+ */
 function useNavLang(): string {
-  if (typeof navigator === 'undefined') return 'en'
-  const lang = navigator.language.split('-')[0]
-  return lang in translations ? lang : 'en'
+  const [lang, setLang] = useState('en')
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return
+    const detected = navigator.language.split('-')[0]
+    // hasOwnProperty rather than `in`: 'constructor' is `in` every object.
+    if (Object.prototype.hasOwnProperty.call(translations, detected)) {
+      setLang(detected)
+    }
+  }, [])
+
+  return lang
 }
 
 // Default slugs used until the config endpoint responds

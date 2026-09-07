@@ -1,5 +1,6 @@
-import type { GlobalConfig } from 'payload'
+import type { FieldAccess, GlobalConfig } from 'payload'
 import type { MaintenancePluginConfig } from '../types.js'
+import { isMaintenanceAdmin } from '../utils/access.js'
 
 export function createMaintenanceGlobal(
   pluginConfig: MaintenancePluginConfig = {},
@@ -14,6 +15,13 @@ export function createMaintenanceGlobal(
   const historySlug = pluginConfig.historySlug ?? 'maintenance-history'
   const enableHistory = pluginConfig.enableHistory !== false
   const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
+  const adminOptions = {
+    adminCollectionSlug: pluginConfig.adminCollectionSlug,
+    adminAccess: pluginConfig.adminAccess,
+  }
+  /** Field-level guard for the credentials stored on this global. */
+  const readAdminOnly: FieldAccess = ({ req }) => isMaintenanceAdmin(req, adminOptions)
+  const adminOnlyField = { read: readAdminOnly }
 
   return {
     slug,
@@ -22,8 +30,13 @@ export function createMaintenanceGlobal(
       fr: 'Mode Maintenance',
     },
     access: {
-      read: () => true,
-      update: ({ req }) => !!req.user,
+      // Admin-only: this global holds webhook URLs, allowedIPs and bypassSecret.
+      // `!!req.user` was not enough — Payload populates req.user for a member of
+      // ANY auth collection of the host app (customers, members...).
+      // Public consumers must use GET /api/<route>/status, which returns a
+      // curated subset and never exposes those fields.
+      read: ({ req }) => isMaintenanceAdmin(req, adminOptions),
+      update: ({ req }) => isMaintenanceAdmin(req, adminOptions),
     },
     hooks: {
       afterChange: [
@@ -644,6 +657,8 @@ export function createMaintenanceGlobal(
                         type: 'text',
                         label: { en: 'Webhook URL', fr: 'URL du webhook' },
                         required: true,
+                        // Slack/Discord webhook URLs are bearer credentials.
+                        access: adminOnlyField,
                         validate: (value: string | null | undefined) => {
                           if (!value) return true
                           try {
@@ -673,6 +688,7 @@ export function createMaintenanceGlobal(
                 name: 'notifyEmail',
                 type: 'email',
                 label: { en: 'Notification email', fr: 'Email de notification' },
+                access: adminOnlyField,
                 admin: {
                   description: {
                     en: 'Receive an email when maintenance mode changes (uses Payload email adapter)',
@@ -714,10 +730,11 @@ export function createMaintenanceGlobal(
                 name: 'allowedIPs',
                 type: 'textarea',
                 label: { en: 'Allowed IPs (one per line)', fr: 'IPs autorisees (une par ligne)' },
+                access: adminOnlyField,
                 admin: {
                   description: {
-                    en: 'These IPs bypass maintenance mode',
-                    fr: 'Ces IPs contournent le mode maintenance',
+                    en: 'NOT read by the middleware yet — the same list must be passed to createMaintenanceMiddleware({ allowedIPs: [...] }) in your middleware.ts, because the middleware cannot read this global without exposing it publicly.',
+                    fr: 'PAS encore lu par le middleware — la meme liste doit etre passee a createMaintenanceMiddleware({ allowedIPs: [...] }) dans votre middleware.ts, car le middleware ne peut pas lire ce global sans l\'exposer publiquement.',
                   },
                 },
               },
@@ -725,10 +742,11 @@ export function createMaintenanceGlobal(
                 name: 'bypassSecret',
                 type: 'text',
                 label: { en: 'Bypass secret', fr: 'Secret de contournement' },
+                access: adminOnlyField,
                 admin: {
                   description: {
-                    en: 'Access the site via ?bypass=YOUR_SECRET for a 24h bypass cookie',
-                    fr: 'Accedez au site via ?bypass=VOTRE_SECRET pour un cookie de contournement 24h',
+                    en: 'NOT read by the middleware yet — pass the same value to createMaintenanceMiddleware({ bypassSecret: "..." }) in your middleware.ts to enable ?bypass=YOUR_SECRET (24h cookie).',
+                    fr: 'PAS encore lu par le middleware — passez la meme valeur a createMaintenanceMiddleware({ bypassSecret: "..." }) dans votre middleware.ts pour activer ?bypass=VOTRE_SECRET (cookie 24h).',
                   },
                 },
               },

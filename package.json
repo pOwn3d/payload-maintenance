@@ -1,6 +1,6 @@
 {
   "name": "@consilioweb/payload-maintenance",
-  "version": "0.5.2",
+  "version": "0.6.0",
   "description": "Payload CMS plugin — customizable maintenance mode page with i18n support",
   "type": "module",
   "main": "./dist/index.cjs",
@@ -55,6 +55,8 @@
   ],
   "scripts": {
     "build": "tsup",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "prepublishOnly": "pnpm build"
   },
@@ -121,6 +123,7 @@
     "next": "^15.0.0",
     "payload": "^3.79.0",
     "tsup": "^8.0.0",
-    "typescript": "^5.5.0"
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.11"
   }
 }

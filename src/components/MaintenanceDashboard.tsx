@@ -57,6 +57,9 @@ const dashboardTranslations: Record<string, Record<string, string>> = {
     advancedConfig: 'Pour les parametres avances,',
     editGlobal: 'editez la configuration globale',
     loading: 'Chargement...',
+    statusUnavailable: 'Statut de maintenance indisponible — la configuration n\'a pas pu etre lue.',
+    retry: 'Reessayer',
+    toggleFailed: 'Echec du basculement — etat inchange',
     activated: 'Active',
     deactivated: 'Desactive',
     scheduledStart: 'Debut planifie',
@@ -87,6 +90,9 @@ const dashboardTranslations: Record<string, Record<string, string>> = {
     advancedConfig: 'For advanced settings,',
     editGlobal: 'edit the global configuration',
     loading: 'Loading...',
+    statusUnavailable: 'Maintenance status unavailable — the configuration could not be read.',
+    retry: 'Retry',
+    toggleFailed: 'Toggle failed — state unchanged',
     activated: 'Activated',
     deactivated: 'Deactivated',
     scheduledStart: 'Scheduled start',
@@ -95,10 +101,24 @@ const dashboardTranslations: Record<string, Record<string, string>> = {
   },
 }
 
+/**
+ * Same hydration trap as MaintenanceNavLink, and worse here: the server falls
+ * back to 'fr' while the client reads the browser language, so an English user
+ * gets the mismatch instead. Detect after hydration, never during render.
+ */
 function useDashboardLang(): string {
-  if (typeof navigator === 'undefined') return 'fr'
-  const lang = navigator.language.split('-')[0]
-  return lang in dashboardTranslations ? lang : 'en'
+  const [lang, setLang] = useState('fr')
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return
+    const detected = navigator.language.split('-')[0]
+    // hasOwnProperty rather than `in`: 'constructor' is `in` every object.
+    if (Object.prototype.hasOwnProperty.call(dashboardTranslations, detected)) {
+      setLang(detected)
+    }
+  }, [])
+
+  return lang
 }
 
 function dt(lang: string, key: string): string {
@@ -110,6 +130,10 @@ const DEFAULT_BASE_PATH = '/api/maintenance'
 
 export const MaintenanceDashboard: React.FC = () => {
   const [status, setStatus] = useState<MaintenanceStatus | null>(null)
+  /** Why the last /status call failed — `null` while it succeeds. Kept apart
+   *  from `status` so the view can tell "not loaded yet" from "unavailable". */
+  const [statusError, setStatusError] = useState<string | null>(null)
+  const [actionError, setActionError] = useState<string | null>(null)
   const [stats, setStats] = useState<Stats | null>(null)
   const [presets, setPresets] = useState<PresetInfo[]>([])
   const [loading, setLoading] = useState(false)
@@ -141,6 +165,17 @@ export const MaintenanceDashboard: React.FC = () => {
       ])
       if (statusResult.status === 'fulfilled' && statusResult.value.ok) {
         setStatus(await statusResult.value.json())
+        setStatusError(null)
+      } else {
+        // /status now answers 503 when the global cannot be read. Leaving
+        // `status` null on that branch froze this view on "Loading..." forever,
+        // with no message and no button — exactly during the incident.
+        const reason =
+          statusResult.status === 'fulfilled'
+            ? `HTTP ${statusResult.value.status}`
+            : 'network error'
+        console.warn(`[maintenance] Status unavailable (${reason})`)
+        setStatusError(reason)
       }
       if (statsResult.status === 'fulfilled' && statsResult.value.ok) {
         setStats(await statsResult.value.json())
@@ -156,12 +191,22 @@ export const MaintenanceDashboard: React.FC = () => {
 
   const toggle = useCallback(async () => {
     setLoading(true)
+    setActionError(null)
     try {
       const res = await fetch(`${basePath}/toggle`, { method: 'POST' })
+      // A 401 (caller is not a maintenance admin) or the handler's 500 still
+      // carries a JSON body, whose `enabled` is undefined: deriving the switch
+      // from it flipped the UI to a green "site online" while nothing had
+      // changed server-side. Never take state from a failed write.
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
-      setStatus((prev) => (prev ? { ...prev, enabled: data.enabled } : null))
+      if (typeof data?.enabled !== 'boolean') throw new Error('malformed toggle response')
+      setStatus((prev) => (prev ? { ...prev, enabled: data.enabled } : prev))
       setTimeout(fetchAll, 500)
-    } catch (err) { console.warn('[maintenance] Toggle failed', err) } finally { setLoading(false) }
+    } catch (err) {
+      console.warn('[maintenance] Toggle failed', err)
+      setActionError(err instanceof Error ? err.message : String(err))
+    } finally { setLoading(false) }
   }, [basePath, fetchAll])
 
   const applyPreset = useCallback(async (presetId: string) => {
@@ -180,7 +225,35 @@ export const MaintenanceDashboard: React.FC = () => {
     } catch (err) { console.warn('[maintenance] Preset apply failed', err) } finally { setApplyingPreset(null) }
   }, [basePath, fetchAll])
 
-  if (!status) return <p>{dt(lang, 'loading')}</p>
+  if (!status) {
+    if (!statusError) return <p>{dt(lang, 'loading')}</p>
+    // Degraded view: say what happened and offer a retry, rather than a spinner
+    // that never resolves.
+    return (
+      <div className="maintenance-dashboard" style={{ padding: 'var(--gutter-h, 2rem)' }}>
+        <h1 style={{ fontSize: '1.25rem', fontWeight: 700, margin: '0 0 0.75rem' }}>
+          {dt(lang, 'title')}
+        </h1>
+        <p style={{ color: '#ef4444', margin: '0 0 0.25rem' }}>{dt(lang, 'statusUnavailable')}</p>
+        <p style={{ opacity: 0.7, fontSize: '0.8rem', margin: '0 0 1rem' }}>{statusError}</p>
+        <button
+          onClick={() => { setStatusError(null); fetchAll() }}
+          style={{
+            padding: '0.5rem 1rem',
+            borderRadius: '0.375rem',
+            border: '1px solid var(--theme-elevation-150, rgba(128,128,128,0.2))',
+            background: 'transparent',
+            cursor: 'pointer',
+            fontSize: '0.8rem',
+            fontWeight: 500,
+            color: 'var(--theme-text, inherit)',
+          }}
+        >
+          {dt(lang, 'retry')}
+        </button>
+      </div>
+    )
+  }
 
   const actionLabels: Record<string, string> = {
     'activated': dt(lang, 'activated'),
@@ -214,6 +287,11 @@ export const MaintenanceDashboard: React.FC = () => {
             <span style={{ fontSize: '0.8rem', fontWeight: 500, color: status.enabled ? '#ef4444' : '#16a34a' }}>
               {status.enabled ? dt(lang, 'maintenanceActive') : dt(lang, 'siteOnline')}
             </span>
+            {actionError && (
+              <span style={{ fontSize: '0.75rem', color: '#ef4444' }} title={actionError}>
+                {dt(lang, 'toggleFailed')}
+              </span>
+            )}
           </div>
         </div>
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap', alignItems: 'center' }}>

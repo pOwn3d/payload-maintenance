@@ -1,5 +1,6 @@
 import type { PayloadHandler } from 'payload'
 import { presets, getPreset, presetToPayloadData } from '../presets/index.js'
+import { isMaintenanceAdmin, unauthorizedResponse, type AdminAccessOptions } from '../utils/access.js'
 
 /**
  * List all available presets.
@@ -21,10 +22,13 @@ export function createPresetsListHandler(): PayloadHandler {
 /**
  * Apply a preset to the maintenance global (admin only).
  */
-export function createApplyPresetHandler(globalSlug: string): PayloadHandler {
+export function createApplyPresetHandler(
+  globalSlug: string,
+  adminOptions: AdminAccessOptions = {},
+): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     try {

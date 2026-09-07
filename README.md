@@ -1,234 +1,62 @@
-<!-- Header Banner -->
-<div align="center">
+# @consilioweb/payload-maintenance
 
-  <a href="https://git.io/typing-svg">
-    <img src="https://readme-typing-svg.demolab.com?font=Fira+Code&weight=700&size=32&duration=3000&pause=1000&color=3B82F6&center=true&vCenter=true&width=700&lines=%40consilioweb%2Fpayload-maintenance;Payload+CMS+Maintenance+Mode;12+Templates+%7C+12+Presets;i18n+10+Languages+%7C+Webhooks;Scheduling+%7C+Newsletter+%7C+503+SEO" alt="Typing SVG" />
-  </a>
+> Maintenance mode for Payload CMS 3 + Next.js: a configurable public page, an admin toggle, scheduling, audit history and webhooks.
 
-  <br><br>
-
-  <!-- Badges -->
-  <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/v/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm version"></a>
-  <a href="https://www.npmjs.com/package/@consilioweb/payload-maintenance"><img src="https://img.shields.io/npm/dw/@consilioweb/payload-maintenance?style=for-the-badge&logo=npm&logoColor=white&color=CB3837" alt="npm downloads"></a>
-  <img src="https://img.shields.io/badge/Payload%20CMS-3.x-0F172A?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj48cGF0aCBkPSJNMTIgMkw0IDdWMTdMMTIgMjJMMjAgMTdWN0wxMiAyWiIgc3Ryb2tlPSJ3aGl0ZSIgc3Ryb2tlLXdpZHRoPSIyIiBzdHJva2UtbGluZWNhcD0icm91bmQiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=&logoColor=white" alt="Payload CMS 3">
-  <img src="https://img.shields.io/badge/Templates-12-8B5CF6?style=for-the-badge" alt="12 Templates">
-  <img src="https://img.shields.io/badge/i18n-10+Languages-F59E0B?style=for-the-badge&logo=translate&logoColor=white" alt="i18n">
-  <a href="https://github.com/pOwn3d/payload-maintenance/blob/main/LICENSE"><img src="https://img.shields.io/badge/License-MIT-7C3AED?style=for-the-badge" alt="MIT License"></a>
-  <img src="https://img.shields.io/badge/TypeScript-5.x-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript">
-
-</div>
-
-<p align="center">
-  <a href="https://buymeacoffee.com/pown3d">
-    <img src="https://img.shields.io/badge/Buy%20me%20a%20coffee-☕-FFDD00?style=for-the-badge&logo=buy-me-a-coffee&logoColor=black" alt="Buy me a coffee" />
-  </a>
-</p>
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-> [!IMPORTANT]
-> ## ⚠️ Next.js 16 + Turbopack — Known Issue
->
-> If you're using **Next.js 16** with Turbopack (default bundler), you may encounter a `createContext is not a function` error during `next build`. This is a **known Payload CMS issue** ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)) — not specific to this plugin.
->
-> **Workaround** — Add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
-> ```ts
-> export const dynamic = 'force-dynamic'
-> ```
->
-> And ensure all `@consilioweb/*` packages are in `transpilePackages` in your `next.config.ts`:
-> ```ts
-> transpilePackages: ['@consilioweb/payload-seo-analyzer', '@consilioweb/payload-admin-nav', /* ...other @consilioweb packages */],
-> ```
->
-> ✅ **Next.js 15** works without any workaround.
+[![npm](https://img.shields.io/npm/v/@consilioweb/payload-maintenance.svg)](https://www.npmjs.com/package/@consilioweb/payload-maintenance)
+[![license](https://img.shields.io/npm/l/@consilioweb/payload-maintenance.svg)](LICENSE)
+[![Payload](https://img.shields.io/badge/Payload-3.x-0F172A.svg)](https://payloadcms.com)
 
 ## About
 
-> **@consilioweb/payload-maintenance** — A complete, production-ready maintenance mode plugin for Payload CMS 3 + Next.js. Includes 12 professional templates (Aurora, Neon, Mesh, Particles...), 12 one-click presets, i18n in 10 languages, scheduled maintenance, GDPR-compliant newsletter with unsubscribe, audit history, webhooks with retry (Slack/Discord), rate limiting, HTTP 503 SEO, and a full admin dashboard. **Self-contained** — no manual route needed.
+Taking a Payload site offline usually means hand-rolling a Next.js middleware, a static page and a way to turn it back on. This plugin ships all three: a maintenance global in the admin panel, a standalone HTML page served by the plugin itself (no route to create), and a middleware helper that returns HTTP 503 with `Retry-After` so crawlers do not de-index the site.
 
-<table>
-  <tr>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/maintenance.png" width="50"/><br>
-      <b>12 Templates</b><br>
-      <sub>Aurora, Neon, Mesh, Particles...</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/language.png" width="50"/><br>
-      <b>10 Languages</b><br>
-      <sub>Auto-detect browser lang</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/calendar--v1.png" width="50"/><br>
-      <b>Scheduling</b><br>
-      <sub>Auto on/off by date</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/webhook.png" width="50"/><br>
-      <b>Webhooks</b><br>
-      <sub>Slack, Discord, Custom</sub>
-    </td>
-  </tr>
-  <tr>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/newsletter.png" width="50"/><br>
-      <b>Newsletter</b><br>
-      <sub>DB storage + CSV export</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/seo-shield.png" width="50"/><br>
-      <b>SEO Ready</b><br>
-      <sub>HTTP 503 + Retry-After</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/paint-palette.png" width="50"/><br>
-      <b>12 Presets</b><br>
-      <sub>One-click apply</sub>
-    </td>
-    <td align="center" width="25%">
-      <img src="https://img.icons8.com/color/96/admin-settings-male.png" width="50"/><br>
-      <b>Admin Dashboard</b><br>
-      <sub>Toggle, preview, stats</sub>
-    </td>
-  </tr>
-</table>
+Around that core it adds what an incident actually needs: an audit trail of who took the site down and for how long, Slack/Discord webhooks with retry, a GDPR-compliant newsletter form with unsubscribe, page-view analytics, and scheduled windows.
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+Since 0.6.0 the plugin is admin-only and fails closed: the configuration global is no longer world-readable, the admin endpoints reject users from non-admin auth collections, and a database outage keeps the site in maintenance instead of silently reopening it.
 
 ## Table of Contents
 
 - [Features](#features)
 - [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Templates](#templates)
-- [Presets](#presets)
 - [Plugin Options](#plugin-options)
 - [Middleware Options](#middleware-options)
+- [Templates](#templates)
+- [Presets](#presets)
 - [API Endpoints](#api-endpoints)
 - [Collections](#collections)
 - [Bypass Maintenance](#bypass-maintenance)
 - [Package Exports](#package-exports)
 - [Requirements](#requirements)
+- [Support](#support)
 - [License](#license)
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
 
 ## Features
 
-### 12 Professional Templates
+- **Self-contained maintenance page** — served as standalone HTML by `GET /api/maintenance/page`. No `/maintenance` route to create in your app.
+- **12 page templates** — from `minimal` to canvas-based `particles`, plus a `custom` HTML template with `{{variables}}`.
+- **12 one-click presets** — template + colors + fonts + messages, applied from the admin dashboard.
+- **Multi-language page** — per-language title, description and CTA configured in the admin, with browser-language auto-detection and a switcher. The page chrome (countdown labels, contact and newsletter strings) ships in 10 languages: `fr`, `en`, `de`, `es`, `it`, `pt`, `nl`, `ja`, `ar`, `zh`.
+- **Scheduled maintenance** — start/end dates with auto-enable and auto-disable, driven by `POST /api/maintenance/schedule-check` (wire it to a cron) and re-checked by the middleware.
+- **Audit history** — every activation and deactivation is logged with who triggered it and how long the site was down, plus every webhook that exhausted its retries.
+- **Webhooks** — Slack, Discord or custom JSON, fired on every toggle, with exponential backoff (3 attempts: 1s, 2s, 4s) and a log collection.
+- **Newsletter with GDPR consent** — signup form on the page, `consent: true` required, `consentAt` / `consentSource` stored, unique unsubscribe token, duplicate prevention, admin CSV export.
+- **Page-view analytics** — path, referer, user agent and IP recorded while maintenance is on, with top-paths and top-referers aggregation.
+- **SEO** — HTTP 503 (configurable), `Retry-After` computed from the estimated end date, `X-Robots-Tag: noindex` and `<meta name="robots" content="noindex,nofollow">`.
+- **Admin dashboard** at `/admin/maintenance` — toggle, live preview, subscriber count with CSV export, history timeline, preset gallery. Plus a toggle widget on the main dashboard and a sidebar nav link.
+- **Design customization** — Google Fonts by name, Lottie animation by URL, dark/light/auto mode, custom CSS and HTML, logo, favicon, background image, background video, split image, social links (8 platforms), contact email.
 
-| Template | Description |
-|----------|-------------|
-| `minimal` | Clean icon + message layout |
-| `countdown` | SVG circular ring countdown |
-| `coming-soon` | Flip card countdown with separators |
-| `glassmorphism` | Frosted glass card with floating orbs |
-| `gradient` | Multi-color animated gradient background |
-| `split-screen` | Content left, image right (responsive) |
-| `video-background` | MP4 video with overlay |
-| `aurora` | **NEW** Northern lights with animated gradient layers, floating particles, SVG waves |
-| `neon` | **NEW** Cyberpunk with pulsing neon glow, grid background, scanline, corner brackets |
-| `mesh` | **NEW** Apple-like animated blobs with mix-blend-mode and noise texture |
-| `particles` | **NEW** Canvas-based interactive particle system with mouse interaction |
-| `custom` | Full custom HTML with `{{variables}}` |
+### Security
 
-### 12 One-Click Presets
-
-Pre-configured templates with colors, fonts, and messages — apply in one click from admin:
-
-| Preset | Template | Style |
-|--------|----------|-------|
-| `corporate-blue` | countdown | Professional dark blue (Inter) |
-| `startup-launch` | gradient | Purple/pink dynamic (Space Grotesk) |
-| `minimal-elegant` | minimal | Clean dark (DM Sans) |
-| `glass-premium` | glassmorphism | Luxurious purple (Outfit) |
-| `coming-soon-creative` | coming-soon | Teal creative (Sora) |
-| `light-clean` | minimal | Light mode (Plus Jakarta Sans) |
-| `warm-gradient` | gradient | Warm orange tones (Poppins) |
-| `tech-dark` | countdown | Cyan tech (JetBrains Mono) |
-| `aurora-borealis` | aurora | **NEW** Teal/violet northern lights (Space Grotesk) |
-| `cyberpunk-neon` | neon | **NEW** Magenta/cyan cyberpunk (Orbitron) |
-| `mesh-modern` | mesh | **NEW** Indigo/rose modern blobs (Geist) |
-| `particles-cosmic` | particles | **NEW** Deep space constellation (Inter) |
-
-### Multi-Language (i18n)
-
-- **10 languages** built-in: FR, EN, DE, ES, IT, PT, NL, JA, AR, ZH
-- **Auto-detection** of browser language
-- **Language switcher** on the maintenance page
-- **Per-language messages** configurable from admin
-
-### Scheduled Maintenance
-
-- Set start and end dates
-- Auto-enable and auto-disable toggles
-- Schedule check endpoint for cron integration
-
-### Newsletter Subscribers (GDPR-compliant)
-
-- Email signup form on the maintenance page
-- **GDPR consent** required (`consent: true` in POST body)
-- `consentAt`, `consentSource` stored per subscriber
-- **Unsubscribe endpoint** with unique token per subscriber
-- Stored in a dedicated Payload collection
-- Duplicate prevention
-- CSV export endpoint for admin users
-- Tracks language, IP, user-agent
-
-### Security & Rate Limiting
-
-- **Rate limiting** on all public endpoints (status: 60/min, newsletter: 5/min, track: 30/min per IP)
-- **Auth check** on all admin endpoints (toggle, stats, export, analytics, schedule-check, presets apply)
-- **JWT validation** — auth cookie verified via /api/users/me (cached 15s) (v0.5.0)
-- **Email validation** with regex on newsletter signup
-- **Webhook retry** with exponential backoff (3 attempts: 1s, 2s, 4s)
-- **trustProxy option** — control IP source for rate limiting behind reverse proxies (v0.5.0)
-- **Bypass secret protection** — no longer exposed in public API responses (v0.5.0)
-- **Input validation** — timezone (IANA), schedule cross-field (end > start), custom CSS (no script/iframe), preset ID whitelist, UUID validation on unsubscribe (v0.5.0)
-
-### Audit History
-
-- Logs every activation/deactivation
-- Records who triggered it and when
-- Calculates maintenance duration
-- Viewable in admin dashboard
-
-### Webhooks & Notifications
-
-- **Slack** — formatted message with emoji
-- **Discord** — markdown formatted
-- **Custom webhook** — JSON payload
-- **Email notification** — via Payload email adapter
-- Fires on every toggle
-
-### SEO
-
-- **HTTP 503** status code (configurable)
-- **Retry-After** header (dynamic from estimated end date)
-- `robots: noindex` on maintenance page
-
-### Design Customization
-
-- **Google Fonts** — dynamic loading by name
-- **Lottie animations** — via URL
-- **Dark / Light / Auto** mode (system preference detection)
-- **Custom CSS** and **Custom HTML** support
-- **Background image**, **video**, **split image** uploads
-- **Logo** and **favicon** uploads
-- **Social links** (8 platforms)
-- **Contact email** display
-
-### Admin Dashboard
-
-- Quick toggle on/off from dashboard
-- Live preview iframe
-- Subscriber count with CSV export link
-- Recent history timeline
-- Visual preset gallery with one-click apply
-- Link to full global configuration
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+- **Admin-only authorization** — the maintenance global and the six admin endpoints require a user of the Payload admin collection (`config.admin.user`), not merely `req.user`. Override with `adminCollectionSlug`, or plug your own RBAC with `adminAccess`.
+- **Field-level guards** — `webhooks[].url`, `bypassSecret`, `allowedIPs` and `notifyEmail` carry their own `access.read`, so they stay hidden even if a host re-opens the global.
+- **Rate limiting per IP** on the public endpoints: status 60/min, newsletter 5/min, track 30/min, unsubscribe 10/min.
+- **Fail-closed status** — `GET /status` answers `503` instead of a fabricated `{ enabled: false }` when the global cannot be read, and the middleware keeps the last known state when `/status` fails.
+- **Auth cookie validation** — the middleware validates the Payload token against `/api/<usersCollectionSlug>/me` (positive and negative answers cached 15s; transient failures are not cached).
+- **Input validation** — email regex on signup, IANA timezone, schedule cross-field (end after start), custom CSS rejecting `script`/`iframe`, preset ID whitelist, UUID check on unsubscribe.
+- **CSV export hardening** — every cell quoted, and formula-injection prefixes (`=`, `+`, `-`, `@`, tab, CR) neutralised.
+- **`trustProxy`** — control whether `x-forwarded-for` / `x-real-ip` is trusted for IP resolution. The plugin option is wired to `GET /status` only; the newsletter, track and unsubscribe rate limits always read the header. The middleware has its own `trustProxy`, which governs the `allowedIPs` check.
+- **Segment-boundary path matching** — `excludedPaths: ['/admin']` no longer leaves `/administration-des-ventes` online.
 
 ## Installation
 
@@ -236,7 +64,7 @@ Pre-configured templates with colors, fonts, and messages — apply in one click
 pnpm add @consilioweb/payload-maintenance
 ```
 
-Or with npm/yarn:
+Or with npm / yarn:
 
 ```bash
 npm install @consilioweb/payload-maintenance
@@ -248,13 +76,27 @@ yarn add @consilioweb/payload-maintenance
 | Package | Version | Required |
 |---------|---------|----------|
 | `payload` | `^3.0.0` | **Yes** |
-| `@payloadcms/next` | `^3.0.0` | Optional (admin views) |
+| `@payloadcms/next` | `^3.0.0` | Optional (admin view) |
 | `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
 | `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
-| `next` | `^14.0.0 \|\| ^15.0.0` | Optional |
-| `react` | `^18.0.0 \|\| ^19.0.0` | Optional |
+| `next` | `^14.0.0 \|\| ^15.0.0 \|\| ^16.0.0` | Optional (middleware, admin view) |
+| `react` | `^18.0.0 \|\| ^19.0.0` | Optional (client components) |
+| `react-dom` | `^18.0.0 \|\| ^19.0.0` | Optional (client components) |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+> [!IMPORTANT]
+> **Next.js 16 + Turbopack — known issue.** With Next.js 16 and Turbopack (the default bundler) you may hit a `createContext is not a function` error during `next build`. This is a Payload CMS issue ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)), not specific to this plugin.
+>
+> Workaround — add this to your admin page (`src/app/(payload)/admin/[[...segments]]/page.tsx`):
+> ```ts
+> export const dynamic = 'force-dynamic'
+> ```
+>
+> And list the plugin in `transpilePackages` in `next.config.ts`:
+> ```ts
+> transpilePackages: ['@consilioweb/payload-maintenance'],
+> ```
+>
+> Next.js 15 works without any workaround.
 
 ## Quick Start
 
@@ -262,6 +104,7 @@ yarn add @consilioweb/payload-maintenance
 
 ```ts
 // payload.config.ts
+import { buildConfig } from 'payload'
 import { maintenancePlugin } from '@consilioweb/payload-maintenance'
 
 export default buildConfig({
@@ -273,6 +116,7 @@ export default buildConfig({
       ],
     }),
   ],
+  // ...rest of your config
 })
 ```
 
@@ -296,137 +140,211 @@ export const config = {
 }
 ```
 
-### 3. Regenerate importmap
+### 3. Regenerate the importmap
 
 ```bash
 pnpm generate:importmap
 ```
 
-That's it! The plugin automatically adds:
-- A **Maintenance** global in Settings
-- **4 collections** (subscribers, history, analytics, webhook-logs)
-- **13 API endpoints** (including standalone HTML page — no route needed!)
-- An admin **dashboard view** at `/admin/maintenance`
-- A **toggle widget** on the admin dashboard
+The plugin then adds:
 
-> **Note**: The maintenance page is **self-contained** — the plugin serves a standalone HTML page via `/api/maintenance/page`. No need to create a `/maintenance` route in your Next.js app.
+- a **Maintenance** global (`maintenance`)
+- up to **4 collections** — subscribers, history and analytics follow their `enable*` flags, webhook logs is always added
+- **13 API endpoints**, including the standalone HTML page
+- an admin **dashboard view** at `/admin/maintenance`
+- a **toggle widget** on the main admin dashboard and a **sidebar nav link**
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+> The maintenance page is self-contained: the plugin serves it via `GET /api/maintenance/page`. You do not need to create a `/maintenance` route in your Next.js app.
 
 ## Plugin Options
 
+Everything passed to `maintenancePlugin()`. The deprecated options below still compile and now log a warning at boot: they are middleware concerns and the plugin never reads them.
+
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `globalSlug` | `string` | `'maintenance'` | Slug du global de configuration |
-| `endpointBasePath` | `string` | `'/maintenance'` | Préfixe des endpoints API |
-| `languages` | `{label, value}[]` | `[{fr}, {en}]` | Langues disponibles pour la page de maintenance |
-| `excludedPaths` | `string[]` | `['/admin', '/api']` | Chemins toujours accessibles (jamais bloqués) |
-| `allowedIPs` | `string[]` | `[]` | Adresses IP qui contournent le mode maintenance |
-| `bypassSecret` | `string` | `undefined` | Paramètre query secret pour contourner la maintenance (ex: `?bypass=secret123`) |
-| `maintenancePageComponent` | `string` | `undefined` | Chemin vers un composant custom pour la page de maintenance (remplace le défaut) |
-| `addDashboardView` | `boolean` | `true` | Ajouter la vue admin à `/admin/maintenance` |
-| `bypassCookieName` | `string` | `'maintenance-bypass'` | Nom du cookie de contournement |
-| `mediaCollectionSlug` | `string` | `'media'` | Slug de la collection pour les uploads |
-| `enableSubscribers` | `boolean` | `true` | Activer la collection d'abonnés newsletter |
-| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Slug de la collection abonnés |
-| `enableHistory` | `boolean` | `true` | Activer la collection d'historique/audit |
-| `historySlug` | `string` | `'maintenance-history'` | Slug de la collection historique |
-| `enableScheduling` | `boolean` | `true` | Activer la maintenance planifiée (activation/désactivation auto) |
-| `authBypass` | `boolean` | `true` | Les utilisateurs Payload connectés contournent la maintenance |
-| `usersCollectionSlug` | `string` | `'users'` | Slug de la collection utilisateurs pour le contournement auth |
-| `enableAnalytics` | `boolean` | `true` | Activer le suivi analytique des pages vues pendant la maintenance |
-| `analyticsSlug` | `string` | `'maintenance-analytics'` | Slug de la collection analytique |
-| `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug de la collection de logs webhook |
-| `showDashboardToggle` | `boolean` | `true` | Show maintenance toggle on the main admin dashboard |
-| `trustProxy` | `boolean` | `false` | Trust x-forwarded-for header for IP resolution (set `true` behind reverse proxy) |
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+| `globalSlug` | `string` | `'maintenance'` | Slug of the configuration global |
+| `endpointBasePath` | `string` | `'/maintenance'` | Prefix for every API endpoint |
+| `languages` | `{ label: string; value: string }[]` | `[{ Francais, fr }, { English, en }]` | Languages offered for the maintenance page messages |
+| `excludedPaths` | `string[]` | `['/admin', '/api']` | Paths reported as always accessible by `GET /status`. The Next.js middleware has its own `excludedPaths` and does not read this one — keep both in sync |
+| `addDashboardView` | `boolean` | `true` | Register the admin view at `/admin/maintenance` |
+| `showDashboardToggle` | `boolean` | `true` | Show the toggle widget on the main admin dashboard |
+| `mediaCollectionSlug` | `string` | `'media'` | Collection used for logo, favicon, background and split image uploads |
+| `enableSubscribers` | `boolean` | `true` | Add the newsletter subscribers collection and its endpoints |
+| `subscribersSlug` | `string` | `'maintenance-subscribers'` | Slug of the subscribers collection |
+| `enableHistory` | `boolean` | `true` | Add the history / audit collection |
+| `historySlug` | `string` | `'maintenance-history'` | Slug of the history collection |
+| `enableAnalytics` | `boolean` | `true` | Add the analytics collection and its endpoints |
+| `analyticsSlug` | `string` | `'maintenance-analytics'` | Slug of the analytics collection |
+| `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug of the webhook logs collection (always added) |
+| `enableScheduling` | `boolean` | `true` | Add scheduled maintenance and the `schedule-check` endpoint |
+| `adminCollectionSlug` | `string` | Payload's admin collection (`config.admin.user`) | Collection whose users may administer maintenance mode: toggle, stats, export, analytics, presets, and read/update the global |
+| `adminAccess` | `({ req }) => boolean \| Promise<boolean>` | `undefined` | Custom authorization check for the admin endpoints and the global. Overrides `adminCollectionSlug` — plug your own RBAC here |
+| `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP for the **`GET /status`** rate limit. Set `false` when not behind a trusted reverse proxy — note it does not reach the newsletter, track and unsubscribe rate limits, which still trust the header |
+| ~~`allowedIPs`~~ | `string[]` | `[]` | **Deprecated — no effect.** The IP check runs in the Next.js middleware: pass it to `createMaintenanceMiddleware({ allowedIPs })` |
+| ~~`bypassSecret`~~ | `string` | `undefined` | **Deprecated — no effect.** Pass it to `createMaintenanceMiddleware({ bypassSecret })` |
+| ~~`bypassCookieName`~~ | `string` | `'maintenance-bypass'` | **Deprecated — no effect.** The cookie is set and read by the middleware: `createMaintenanceMiddleware({ bypassCookieName })` |
+| ~~`authBypass`~~ | `boolean` | `true` | **Deprecated — no effect.** Use the `authBypass` checkbox on the global (which the middleware does honour), or `createMaintenanceMiddleware({ authBypass })` |
+| ~~`usersCollectionSlug`~~ | `string` | `undefined` | **Deprecated — no effect.** It only ever configured the middleware auth bypass: `createMaintenanceMiddleware({ usersCollectionSlug })`. It does **not** drive the admin authorization gate — `adminCollectionSlug` does |
+| ~~`maintenancePageComponent`~~ | `string` | `undefined` | **Deprecated — never implemented.** The page is served by `GET /api/maintenance/page`; override it with the middleware option `maintenancePagePath` |
 
 ## Middleware Options
 
+Everything passed to `createMaintenanceMiddleware()`.
+
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
-| `excludedPaths` | `string[]` | `['/admin', '/api']` | Never-blocked paths |
-| `cacheDuration` | `number` | `10` | Status cache (seconds) |
-| `return503` | `boolean` | `true` | HTTP 503 for SEO |
-| `authBypass` | `boolean` | `true` | Logged-in users bypass |
-| `authCookieName` | `string` | `'payload-token'` | Payload auth cookie |
-| `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie |
-| `apiUrl` | `string` | Same origin | Custom API URL |
+| `apiUrl` | `string` | Request origin | Base URL of the Payload API |
+| `excludedPaths` | `string[]` | `['/admin', '/api']` | Never-blocked paths, matched on segment boundaries |
+| `cacheDuration` | `number` | `10` | Status cache, in seconds |
+| `statusEndpoint` | `string` | `'/api/maintenance/status'` | Status endpoint to poll |
+| `maintenancePagePath` | `string` | `'/api/maintenance/page'` | Standalone HTML page endpoint to serve |
+| `return503` | `boolean` | `true` | Answer HTTP 503 instead of 200 |
+| `authBypass` | `boolean` | `true` | Let logged-in admin users through |
+| `authCookieName` | `string` | `'payload-token'` | Payload auth cookie name |
+| `usersCollectionSlug` | `string` | `'users'` | Collection queried to validate the auth cookie — must be the Payload admin collection |
+| `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie name |
+| `bypassSecret` | `string` | `undefined` | Enables `?bypass=SECRET`, which sets a 24h cookie. Server-side only, never exposed by the API |
+| `allowedIPs` | `string[]` | `[]` | IPs that bypass maintenance. Server-side only, never exposed by the API |
+| `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP for the `allowedIPs` check. Distinct from the plugin option of the same name |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+## Templates
+
+Chosen from the `template` select on the maintenance global. All 12 are rendered by the standalone page endpoint, which is what visitors see.
+
+| Template | Description |
+|----------|-------------|
+| `minimal` | Clean icon + message layout (default) |
+| `countdown` | SVG circular ring countdown |
+| `coming-soon` | Flip card countdown with separators |
+| `glassmorphism` | Frosted glass card with floating orbs |
+| `gradient` | Multi-color animated gradient background |
+| `split-screen` | Content left, image right (responsive) |
+| `video-background` | MP4 video with overlay |
+| `aurora` | Northern lights: animated gradient layers, floating particles, SVG waves |
+| `neon` | Cyberpunk: pulsing neon glow, grid background, scanline, corner brackets |
+| `mesh` | Animated blobs with `mix-blend-mode` and noise texture |
+| `particles` | Canvas particle system with mouse interaction |
+| `custom` | Full custom HTML with `{{variables}}` |
+
+> The exported React `MaintenancePage` component implements the first seven plus `custom`; `aurora`, `neon`, `mesh` and `particles` fall back to its default layout there. Use the served page (`/api/maintenance/page`, which the middleware fetches) for the full set.
+
+## Presets
+
+Template + colors + font + messages, applied in one click from the admin dashboard. Listed by `GET /api/maintenance/presets`, applied by `POST /api/maintenance/presets/apply`.
+
+| Preset | Template | Style |
+|--------|----------|-------|
+| `corporate-blue` | countdown | Professional dark blue (Inter) |
+| `startup-launch` | gradient | Purple/pink dynamic (Space Grotesk) |
+| `minimal-elegant` | minimal | Clean dark (DM Sans) |
+| `glass-premium` | glassmorphism | Luxurious purple (Outfit) |
+| `coming-soon-creative` | coming-soon | Teal creative (Sora) |
+| `light-clean` | minimal | Light mode (Plus Jakarta Sans) |
+| `warm-gradient` | gradient | Warm orange tones (Poppins) |
+| `tech-dark` | countdown | Cyan tech (JetBrains Mono) |
+| `aurora-borealis` | aurora | Teal/violet northern lights (Space Grotesk) |
+| `cyberpunk-neon` | neon | Magenta/cyan cyberpunk (Orbitron) |
+| `mesh-modern` | mesh | Indigo/rose modern blobs (Geist) |
+| `particles-cosmic` | particles | Deep space constellation (Inter) |
 
 ## API Endpoints
 
-| Method | Path | Auth | Description |
-|--------|------|------|-------------|
-| `GET` | `/api/maintenance/status` | Public | Full maintenance status |
-| `POST` | `/api/maintenance/toggle` | Admin | Toggle on/off |
-| `POST` | `/api/maintenance/newsletter` | Public | Newsletter signup |
-| `GET` | `/api/maintenance/stats` | Admin | Subscribers count + history |
-| `GET` | `/api/maintenance/subscribers/export` | Admin | CSV export |
-| `GET` | `/api/maintenance/presets` | Public | List available presets |
-| `POST` | `/api/maintenance/presets/apply` | Admin | Apply a preset |
-| `POST` | `/api/maintenance/schedule-check` | Admin | Check and apply scheduled dates (v0.5.0: moved from GET to POST) |
-| `GET` | `/api/maintenance/page` | Public | Standalone HTML maintenance page |
-| `POST` | `/api/maintenance/track` | Public | Analytics page view tracking |
-| `GET` | `/api/maintenance/analytics` | Admin | Analytics data |
-| `GET` | `/api/maintenance/unsubscribe` | Public | Unsubscribe by token |
+Paths are relative to `endpointBasePath` (default `/maintenance`) under Payload's `/api`. **Admin** means a user of the admin collection — see `adminCollectionSlug` and `adminAccess`; anything else answers `401`.
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+| Method | Path | Access | Description |
+|--------|------|--------|-------------|
+| `GET` | `/api/maintenance/status` | Public | Public status subset. Answers `503` with `Retry-After: 10` if the global cannot be read |
+| `POST` | `/api/maintenance/toggle` | Admin | Turn maintenance on or off |
+| `POST` | `/api/maintenance/newsletter` | Public | Newsletter signup — requires `{ email, consent: true }` |
+| `GET` | `/api/maintenance/stats` | Admin | Subscriber count and recent history |
+| `GET` | `/api/maintenance/subscribers/export` | Admin | CSV export (only when `enableSubscribers`) |
+| `GET` | `/api/maintenance/unsubscribe` | Public | Unsubscribe by token (only when `enableSubscribers`) |
+| `POST` | `/api/maintenance/track` | Public | Record a page view (only when `enableAnalytics`) |
+| `GET` | `/api/maintenance/analytics` | Admin | Analytics data (only when `enableAnalytics`) |
+| `POST` | `/api/maintenance/schedule-check` | Admin | Apply the scheduled window (only when `enableScheduling`) |
+| `GET` | `/api/maintenance/config` | Public | Slugs and base path, used by the admin nav link and dashboard |
+| `GET` | `/api/maintenance/page` | Public | Standalone HTML maintenance page |
+| `GET` | `/api/maintenance/presets` | Public | List the available presets |
+| `POST` | `/api/maintenance/presets/apply` | Admin | Apply a preset to the global |
 
 ## Collections
 
-The plugin automatically creates two collections:
+| Slug | Role | Read | Create | Update | Delete |
+|------|------|------|--------|--------|--------|
+| `maintenance-subscribers` | Newsletter signups | Authenticated | Authenticated | Authenticated | Authenticated |
+| `maintenance-history` | Audit trail of every toggle | Authenticated | Authenticated | Never | Authenticated |
+| `maintenance-analytics` | Page views during maintenance | Authenticated | Authenticated | Never | Authenticated |
+| `maintenance-webhook-logs` | Webhook delivery attempts | Authenticated | Authenticated | Never | Authenticated |
+
+Subscribers, history and analytics are only added when their `enable*` option is left on; webhook logs is always added. The plugin's own writes go through the Local API and are not subject to these rules — a public signup must call `POST /api/maintenance/newsletter`, which enforces the rate limit, the consent check and email validation.
 
 ### `maintenance-subscribers`
 
 | Field | Type | Description |
 |-------|------|-------------|
 | `email` | email (unique) | Subscriber email |
-| `language` | text | Browser language |
+| `language` | text | Browser language, normalised to `xx` / `xx-XX` or `unknown` |
 | `subscribedAt` | date | Registration date |
 | `ip` | text | IP address |
 | `userAgent` | text | Browser user agent |
 | `consentAt` | date | GDPR consent timestamp |
-| `consentSource` | text | Consent origin (maintenance-page) |
-| `unsubscribeToken` | text (unique) | Token for unsubscribe link |
+| `consentSource` | text | Consent origin (`maintenance-page`) |
+| `unsubscribeToken` | text (unique) | Token for the unsubscribe link |
 
 ### `maintenance-history`
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `action` | select | activated / deactivated / scheduled-start / scheduled-end |
-| `triggeredBy` | text | User email or "system" |
+| `action` | select | `activated` / `deactivated` / `webhook-failed`. The schema also accepts `scheduled-start`, `scheduled-end` and `config-updated`, which nothing writes today — a scheduled window flips `enabled`, so it is logged as `activated` / `deactivated` |
+| `triggeredBy` | text | User email, or `system` |
 | `timestamp` | date | When it happened |
-| `duration` | text | Maintenance duration (on deactivation) |
-| `details` | json | Template, message count, etc. |
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+| `duration` | text | How long maintenance lasted (on deactivation) |
+| `details` | json | Template and message count |
 
 ## Bypass Maintenance
 
-Multiple ways to bypass the maintenance page:
-
 | Method | How |
 |--------|-----|
-| **Bypass cookie** | Visit `?bypass=YOUR_SECRET` — sets a 24h cookie |
-| **IP whitelist** | Configure allowed IPs in admin (Access tab) |
-| **Auth bypass** | Logged-in Payload admin users automatically see the real site |
-| **Route exclusion** | Exclude specific routes (e.g. `/pricing`, `/legal/*`) in admin |
-| **Path exclusion** | `/admin` and `/api` are always accessible |
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+| **Bypass cookie** | Visit `?bypass=YOUR_SECRET`, which sets a 24h cookie. Requires `createMaintenanceMiddleware({ bypassSecret })` — the admin field alone is **not** read by the middleware |
+| **IP whitelist** | Requires `createMaintenanceMiddleware({ allowedIPs })` — the admin field alone is **not** read by the middleware |
+| **Auth bypass** | Logged-in users of the collection given by the middleware's `usersCollectionSlug` see the real site. Enabled by the `authBypass` checkbox on the global and the middleware's `authBypass` option |
+| **Route exclusion** | List routes (`/pricing`, `/legal/*`) in the global's "Excluded routes" field |
+| **Path exclusion** | The middleware's `excludedPaths` (default `/admin`, `/api`), matched on segment boundaries |
 
 ## Package Exports
 
+| Sub-path | Exposes | Environment |
+|----------|---------|-------------|
+| `.` | Plugin, global, collection factories, endpoint handlers, presets, access helper, types | Server |
+| `./client` | `MaintenancePage`, `MaintenanceToggle`, `MaintenanceViewClient`, `MaintenanceNavLink` | Client (`'use client'`) |
+| `./views` | `MaintenanceView` — the admin view server component | Server (RSC) |
+| `./middleware` | `createMaintenanceMiddleware`, `MaintenanceMiddlewareConfig` | Next.js middleware (edge) |
+
 ```ts
-// Server — plugin, types, globals, endpoints, collections, presets
+// Server
 import {
   maintenancePlugin,
   createMaintenanceGlobal,
   createSubscribersCollection,
   createHistoryCollection,
+  createAnalyticsCollection,
+  createWebhookLogsCollection,
+  createStatusHandler,
+  createToggleHandler,
+  createNewsletterHandler,
+  createSubscribersExportHandler,
+  createStatsHandler,
+  createScheduleCheckHandler,
+  createTrackViewHandler,
+  createAnalyticsHandler,
+  createUnsubscribeHandler,
+  createPresetsListHandler,
+  createApplyPresetHandler,
+  createMaintenancePageHandler,
+  isMaintenanceAdmin,
+  rateLimit,
+  rateLimitResponse,
+  getNowInTimezone, // deprecated — display formatting only
   presets,
   getPreset,
   presetToPayloadData,
@@ -437,9 +355,13 @@ import type {
   MaintenanceMessage,
   MaintenanceStatus,
   MaintenanceTemplate,
+  MaintenanceType,
+  ScheduleConfig,
   SocialLink,
   WebhookConfig,
   MaintenancePreset,
+  AdminAccessCheck,
+  AdminAccessOptions,
 } from '@consilioweb/payload-maintenance'
 
 // Client — React components
@@ -447,90 +369,39 @@ import {
   MaintenancePage,
   MaintenanceToggle,
   MaintenanceViewClient,
+  MaintenanceNavLink,
 } from '@consilioweb/payload-maintenance/client'
 
-// Views — server components for admin
+// Views — admin server component
 import { MaintenanceView } from '@consilioweb/payload-maintenance/views'
 
-// Middleware — Next.js middleware helper
+// Middleware — Next.js helper
 import { createMaintenanceMiddleware } from '@consilioweb/payload-maintenance/middleware'
 import type { MaintenanceMiddlewareConfig } from '@consilioweb/payload-maintenance/middleware'
 ```
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+`isMaintenanceAdmin(req, { adminCollectionSlug, adminAccess })` is exported so you can gate endpoints of your own with the same rule the plugin uses.
+
+`getNowInTimezone` is deprecated since 0.6.0 and kept only because it is part of the published API surface. It reparses a wall-clock string as server-local time, so never compare its result against a Payload date field — schedule comparisons use plain UTC instants. Safe for display formatting only.
 
 ## Requirements
 
-- **Node.js** >= 18
-- **Payload CMS** 3.x
-- **Next.js** 14.x or 15.x
-- **React** 18.x or 19.x
-- **Database**: Any Payload-supported adapter (SQLite, PostgreSQL, MongoDB)
+| Requirement | Version |
+|-------------|---------|
+| Node.js | `>=18` |
+| Payload CMS | `^3.0.0` |
+| Next.js | `^14.0.0 \|\| ^15.0.0 \|\| ^16.0.0` |
+| React / React DOM | `^18.0.0 \|\| ^19.0.0` |
+| Database | any Payload-supported adapter (SQLite, PostgreSQL, MongoDB) |
 
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
+## Support
 
-## Uninstall
+- Issues and feature requests: [github.com/pOwn3d/payload-maintenance/issues](https://github.com/pOwn3d/payload-maintenance/issues)
+- Changelog: [CHANGELOG.md](CHANGELOG.md)
+- If this plugin saves you time: [buy me a coffee](https://buymeacoffee.com/pown3d)
 
-1. Remove the plugin from `payload.config.ts`
-2. Remove the middleware from `src/middleware.ts`
-3. Uninstall: `pnpm remove @consilioweb/payload-maintenance`
-4. Regenerate importmap: `pnpm generate:importmap`
-
-### Data cleanup (optional)
-
-The plugin collections remain in your database. To remove them:
-
-**SQLite:**
-```sql
-DROP TABLE IF EXISTS "maintenance-subscribers";
-DROP TABLE IF EXISTS "maintenance-history";
-```
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-## Roadmap
-
-- Email notifications to subscribers when maintenance starts/ends
-- Cron-based scheduled maintenance (independent of page visits)
-- CIDR range support for IP whitelisting (e.g. 192.168.1.0/24)
-- Maintenance page template editor (WYSIWYG in admin)
-- Multi-language maintenance pages
-- Automatic analytics cleanup (configurable retention period)
-- Slack / Discord webhook notifications
-- Estimated time remaining countdown
-
-## ☕ Support
-
-If this plugin saves you time, consider buying me a coffee!
-
-<a href="https://buymeacoffee.com/pown3d">
-  <img src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png" alt="Buy Me A Coffee" width="217" />
-</a>
+Made by [ConsilioWEB](https://consilioweb.fr).
 
 ## License
 
 [MIT](LICENSE)
-
-<img src="https://raw.githubusercontent.com/andreasbm/readme/master/assets/lines/rainbow.png" alt="line">
-
-<div align="center">
-
-### Author
-
-**Made with passion by [ConsilioWEB](https://consilioweb.fr)**
-
-<a href="https://www.linkedin.com/in/christophe-lopez/">
-  <img src="https://img.shields.io/badge/LinkedIn-0077B5?style=for-the-badge&logo=linkedin&logoColor=white" alt="LinkedIn">
-</a>
-<a href="https://github.com/pOwn3d">
-  <img src="https://img.shields.io/badge/GitHub-100000?style=for-the-badge&logo=github&logoColor=white" alt="GitHub">
-</a>
-<a href="https://consilioweb.fr">
-  <img src="https://img.shields.io/badge/Website-consilioweb.fr-3B82F6?style=for-the-badge&logo=google-chrome&logoColor=white" alt="Website">
-</a>
-
-<br><br>
-
-<img src="https://capsule-render.vercel.app/api?type=waving&color=gradient&customColorList=6,11,20&height=100&section=footer" width="100%"/>
-
-</div>
