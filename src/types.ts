@@ -1,3 +1,7 @@
+import type { AdminAccessCheck } from './utils/access.js'
+
+export type { AdminAccessCheck }
+
 export interface MaintenanceMessage {
   language: string
   title: string
@@ -47,22 +51,37 @@ export interface MaintenancePluginConfig {
   /** Languages available for the maintenance page (default: ['fr', 'en']) */
   languages?: { label: string; value: string }[]
 
-  /** Paths excluded from maintenance mode — always accessible (default: ['/admin', '/api']) */
+  /** Paths reported as always accessible by GET /<basePath>/status
+   *  (default: ['/admin', '/api']).
+   *  The Next.js middleware has its own `excludedPaths` and does not read this
+   *  one — keep both in sync. */
   excludedPaths?: string[]
 
-  /** IP addresses that bypass maintenance mode */
+  /** IP addresses that bypass maintenance mode.
+   *  @deprecated Not read by the plugin: the IP check runs inside the Next.js
+   *  middleware, which cannot read this config. Pass the list to
+   *  `createMaintenanceMiddleware({ allowedIPs })` instead. Kept for one more
+   *  minor so existing configs keep compiling; it will be removed. */
   allowedIPs?: string[]
 
-  /** Secret query param to bypass maintenance (e.g. ?bypass=secret123) */
+  /** Secret query param to bypass maintenance (e.g. ?bypass=secret123).
+   *  @deprecated Not read by the plugin: the bypass runs inside the Next.js
+   *  middleware. Pass it to `createMaintenanceMiddleware({ bypassSecret })`. */
   bypassSecret?: string
 
-  /** Custom component path for the maintenance page (overrides default) */
+  /** Custom component path for the maintenance page (overrides default).
+   *  @deprecated Never implemented. The maintenance page is served by
+   *  `GET /api<basePath>/page`; override it with the middleware option
+   *  `maintenancePagePath`. */
   maintenancePageComponent?: string
 
   /** Add admin dashboard view (default: true) */
   addDashboardView?: boolean
 
-  /** Cookie name for bypass (default: 'maintenance-bypass') */
+  /** Cookie name for bypass (default: 'maintenance-bypass').
+   *  @deprecated Not read by the plugin: the cookie is set and read by the
+   *  Next.js middleware. Pass it to
+   *  `createMaintenanceMiddleware({ bypassCookieName })`. */
   bypassCookieName?: string
 
   /** Media collection slug for uploads (default: 'media') */
@@ -83,11 +102,30 @@ export interface MaintenancePluginConfig {
   /** Enable scheduled maintenance (auto on/off) (default: true) */
   enableScheduling?: boolean
 
-  /** Allow logged-in Payload users to bypass maintenance (default: true) */
+  /** Allow logged-in Payload users to bypass maintenance (default: true).
+   *  @deprecated Not read by the plugin. Use the `authBypass` checkbox on the
+   *  maintenance global (which IS honoured by the middleware), or
+   *  `createMaintenanceMiddleware({ authBypass })`. */
   authBypass?: boolean
 
-  /** Users collection slug for auth bypass (default: 'users') */
+  /** Collection queried by the middleware auth bypass.
+   *  @deprecated Not read by the plugin: the auth bypass runs inside the
+   *  Next.js middleware. Pass it to
+   *  `createMaintenanceMiddleware({ usersCollectionSlug })`.
+   *  It deliberately does NOT drive the admin authorization gate — use
+   *  `adminCollectionSlug` for that. */
   usersCollectionSlug?: string
+
+  /** Collection whose users may administer maintenance mode: toggle it, export
+   *  subscribers, apply presets, read the global (default: the collection
+   *  Payload uses for the admin panel, i.e. `config.admin.user`, so hosts that
+   *  renamed `users` keep working without configuring anything). */
+  adminCollectionSlug?: string
+
+  /** Custom authorization check for the admin-only endpoints and for the
+   *  maintenance global. Overrides `adminCollectionSlug` when provided — plug
+   *  your own RBAC here (roles, tenants...). */
+  adminAccess?: AdminAccessCheck
 
   /** Enable page view analytics during maintenance (default: true) */
   enableAnalytics?: boolean

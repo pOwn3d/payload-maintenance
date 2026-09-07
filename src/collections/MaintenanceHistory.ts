@@ -15,7 +15,11 @@ export function createHistoryCollection(slug: string = 'maintenance-history'): C
     },
     access: {
       read: ({ req }) => !!req.user,
-      create: () => true,
+      // Writes come from the plugin's own endpoints via the Local API
+      // (payload.create defaults to overrideAccess: true), so closing this
+      // does not break the public newsletter/tracking flows — it only stops
+      // anonymous POST /api/<slug> from forging rows.
+      create: ({ req }) => !!req.user,
       update: () => false,
       delete: ({ req }) => !!req.user,
     },

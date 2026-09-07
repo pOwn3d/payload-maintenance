@@ -17,6 +17,8 @@ export {
   createUnsubscribeHandler,
 } from './endpoints/status.js'
 export { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
+export { isMaintenanceAdmin } from './utils/access.js'
+export type { AdminAccessCheck, AdminAccessOptions } from './utils/access.js'
 export { getNowInTimezone } from './utils/timezone.js'
 export { createPresetsListHandler, createApplyPresetHandler } from './endpoints/presets.js'
 export { createMaintenancePageHandler } from './endpoints/page.js'

@@ -9,19 +9,41 @@ const toggleTranslations: Record<string, Record<string, string>> = {
     siteOnline: 'Site en ligne',
     disable: 'Desactiver la maintenance',
     enable: 'Activer la maintenance',
+    toggleFailed: 'Echec — etat inchange',
   },
   en: {
     maintenanceActive: 'Maintenance active',
     siteOnline: 'Site online',
     disable: 'Disable maintenance',
     enable: 'Enable maintenance',
+    toggleFailed: 'Failed — state unchanged',
   },
 }
 
+/**
+ * Language for the toggle labels.
+ *
+ * Same hydration trap as MaintenanceNavLink, with an extra twist: the SSR branch
+ * returned 'fr' while the client branch fell back to 'en', so an English browser
+ * rendered "Site en ligne" on the server and "Site online" on the client — a
+ * guaranteed #418 for every non-French user.
+ *
+ * Fix: start on the server's value and switch inside an effect, which only runs
+ * once hydration has completed.
+ */
 function useToggleLang(): string {
-  if (typeof navigator === 'undefined') return 'fr'
-  const lang = navigator.language.split('-')[0]
-  return lang in toggleTranslations ? lang : 'en'
+  const [lang, setLang] = useState('en')
+
+  useEffect(() => {
+    if (typeof navigator === 'undefined') return
+    const detected = navigator.language.split('-')[0]
+    // hasOwnProperty rather than `in`: 'constructor' is `in` every object.
+    if (Object.prototype.hasOwnProperty.call(toggleTranslations, detected)) {
+      setLang(detected)
+    }
+  }, [])
+
+  return lang
 }
 
 function tt(lang: string, key: string): string {
@@ -39,26 +61,42 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
   const [enabled, setEnabled] = useState<boolean | null>(null)
   const [visible, setVisible] = useState(true)
   const [loading, setLoading] = useState(false)
+  const [failed, setFailed] = useState(false)
   const lang = useToggleLang()
 
   useEffect(() => {
     fetch(`${basePath}/status`)
-      .then((r) => r.json())
+      .then((r) => {
+        // Never claim "site online" from a failed status call: /status answers
+        // 503 when the global cannot be read.
+        if (!r.ok) throw new Error(`status ${r.status}`)
+        return r.json()
+      })
       .then((d) => {
         setEnabled(Boolean(d.enabled))
         if (d.showDashboardToggle === false) setVisible(false)
       })
-      .catch(() => setEnabled(false))
+      // Unknown status: hide the widget rather than display a green "site online".
+      .catch(() => setVisible(false))
   }, [basePath])
 
   const toggle = useCallback(async () => {
     setLoading(true)
+    setFailed(false)
     try {
       const res = await fetch(`${basePath}/toggle`, { method: 'POST' })
+      // Same invariant as the /status read: never derive the switch from a
+      // failed call. A 401 (caller is not a maintenance admin) or the handler's
+      // 500 answers a JSON error body whose `enabled` is undefined, and
+      // `Boolean(undefined)` used to flip the widget to a green "site online"
+      // while the site was still down.
+      if (!res.ok) throw new Error(`toggle ${res.status}`)
       const data = await res.json()
-      setEnabled(Boolean(data.enabled))
-    } catch {
-      // noop
+      if (typeof data?.enabled !== 'boolean') throw new Error('malformed toggle response')
+      setEnabled(data.enabled)
+    } catch (err) {
+      console.warn('[maintenance] Toggle failed', err)
+      setFailed(true)
     } finally {
       setLoading(false)
     }
@@ -118,6 +156,9 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
       }}>
         {enabled ? tt(lang, 'maintenanceActive') : tt(lang, 'siteOnline')}
       </span>
+      {failed && (
+        <span style={{ fontSize: '0.75rem', color: '#ef4444' }}>{tt(lang, 'toggleFailed')}</span>
+      )}
     </div>
   )
 }

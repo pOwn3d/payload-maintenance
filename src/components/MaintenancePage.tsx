@@ -817,7 +817,12 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({
 
   useEffect(() => {
     fetch(statusEndpoint)
-      .then((r) => r.json())
+      .then((r) => {
+        // /status answers 503 when it cannot read the global — fall through to
+        // the catch so the safe maintenance fallback is rendered.
+        if (!r.ok) throw new Error(`status ${r.status}`)
+        return r.json()
+      })
       .then((d: MaintenanceData) => {
         setData(d)
         if (!forceLang && d.messages?.length) setCurrentLang(detectLanguage(d.messages))

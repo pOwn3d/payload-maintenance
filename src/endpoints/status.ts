@@ -2,11 +2,33 @@ import type { PayloadHandler } from 'payload'
 import crypto from 'crypto'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 import { getEffectiveEnabled, checkScheduleState } from '../utils/schedule.js'
+import { isMaintenanceAdmin, unauthorizedResponse, type AdminAccessOptions } from '../utils/access.js'
 
-function resolveMediaUrl(media: any): string | null {
+/**
+ * Quote every CSV cell and neutralise spreadsheet formula injection.
+ * Two exported columns (`language`, `ip`) originate from an anonymous request on
+ * /newsletter, and Excel evaluates any cell starting with = + - @ (tab / CR too)
+ * — including inside quotes — as soon as the admin opens the export.
+ */
+function csvCell(value: unknown): string {
+  const raw = value === null || value === undefined ? '' : String(value)
+  const guarded = /^[=+\-@\t\r]/.test(raw) ? `'${raw}` : raw
+  return `"${guarded.replace(/"/g, '""')}"`
+}
+
+function resolveMediaUrl(media: any, mediaSlug: string): string | null {
   if (!media) return null
-  if (typeof media === 'string') return media
-  return media.url || media.filename ? `/${media.filename}` : null
+  // An unpopulated relation is a bare id — a string on Mongo, a number on
+  // SQLite/Postgres. The numeric case already fell through to null, but the
+  // string case was returned verbatim and rendered as <img src="65f1c2d3…">.
+  // Accept a string only when it actually looks like a URL.
+  if (typeof media === 'number') return null
+  if (typeof media === 'string') return /^(https?:\/\/|\/)/.test(media) ? media : null
+  // Operator precedence: `a || b ? x : null` parses as `(a || b) ? x : null`,
+  // so the real URL served by Payload (or by the storage adapter) used to be
+  // tested and then discarded in favour of a bare `/<filename>` path that 404s.
+  if (media.url) return media.url as string
+  return media.filename ? `/api/${mediaSlug}/file/${media.filename}` : null
 }
 
 /** Extract client IP from request headers */
@@ -30,7 +52,12 @@ function getClientIP(req: any, trustProxy: boolean = true): string {
  * Schedule-based auto-toggle has been moved to the POST schedule-check endpoint
  * to avoid side-effects in a GET handler.
  */
-export function createStatusHandler(globalSlug: string, trustProxy: boolean = true): PayloadHandler {
+export function createStatusHandler(
+  globalSlug: string,
+  trustProxy: boolean = true,
+  mediaSlug: string = 'media',
+  excludedPaths: string[] = ['/admin', '/api'],
+): PayloadHandler {
   return async (req) => {
     // Rate limit: 60 requests per minute per IP
     const ip = getClientIP(req, trustProxy)
@@ -67,14 +94,14 @@ export function createStatusHandler(globalSlug: string, trustProxy: boolean = tr
         maintenanceType: maintenance.maintenanceType || 'maintenance',
         messages: maintenance.messages || [],
         estimatedEnd: maintenance.estimatedEnd || null,
-        excludedPaths: ['/admin', '/api'],
+        excludedPaths,
         excludedRoutes,
         authBypass: maintenance.authBypass !== false,
         // Media
-        logoUrl: resolveMediaUrl(maintenance.logo) || null,
-        backgroundImageUrl: resolveMediaUrl(maintenance.backgroundImage) || null,
-        faviconUrl: resolveMediaUrl(maintenance.favicon) || null,
-        splitImageUrl: resolveMediaUrl(maintenance.splitImage) || null,
+        logoUrl: resolveMediaUrl(maintenance.logo, mediaSlug) || null,
+        backgroundImageUrl: resolveMediaUrl(maintenance.backgroundImage, mediaSlug) || null,
+        faviconUrl: resolveMediaUrl(maintenance.favicon, mediaSlug) || null,
+        splitImageUrl: resolveMediaUrl(maintenance.splitImage, mediaSlug) || null,
         videoUrl: (maintenance.videoUrl as string) || null,
         // Design
         backgroundColor: maintenance.backgroundColor || '#0f172a',
@@ -101,12 +128,16 @@ export function createStatusHandler(globalSlug: string, trustProxy: boolean = tr
         showDashboardToggle: maintenance.showDashboardToggle !== false,
       })
     } catch (error) {
-      return Response.json({
-        enabled: false,
-        template: 'minimal',
-        messages: [],
-        error: 'Failed to fetch maintenance status',
-      })
+      // Fail closed, and loudly. Answering HTTP 200 `{enabled: false}` here told
+      // every caller "no maintenance" at the exact moment the database was down,
+      // which let the middleware serve a broken site (and let crawlers index it).
+      // `enabled` is deliberately absent from the body so a caller that ignores
+      // the status code cannot read a fabricated "false".
+      req.payload.logger.error(`[maintenance] Status check failed: ${error}`)
+      return Response.json(
+        { error: 'Failed to fetch maintenance status' },
+        { status: 503, headers: { 'Retry-After': '10' } },
+      )
     }
   }
 }
@@ -114,10 +145,13 @@ export function createStatusHandler(globalSlug: string, trustProxy: boolean = tr
 /**
  * Toggle maintenance mode on/off (admin only).
  */
-export function createToggleHandler(globalSlug: string): PayloadHandler {
+export function createToggleHandler(
+  globalSlug: string,
+  adminOptions: AdminAccessOptions = {},
+): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     try {
@@ -179,6 +213,11 @@ export function createNewsletterHandler(
         return Response.json({ error: 'Consent is required' }, { status: 400 })
       }
 
+      // The browser language ends up verbatim in the CSV export, so keep it to a
+      // strict BCP-47 subset. An unexpected value is recorded as 'unknown'
+      // rather than rejected: a signup must not fail on an exotic locale tag.
+      const safeLanguage = language && /^[a-z]{2}(-[A-Z]{2})?$/.test(language) ? language : 'unknown'
+
       if (enableSubscribers) {
         // Check for duplicate
         const existing = await req.payload.find({
@@ -195,7 +234,7 @@ export function createNewsletterHandler(
           collection: subscribersSlug as any,
           data: {
             email,
-            language: language || 'unknown',
+            language: safeLanguage,
             subscribedAt: new Date().toISOString(),
             ip,
             userAgent: req.headers.get('user-agent') || '',
@@ -219,10 +258,11 @@ export function createNewsletterHandler(
  */
 export function createSubscribersExportHandler(
   subscribersSlug: string = 'maintenance-subscribers',
+  adminOptions: AdminAccessOptions = {},
 ): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     try {
@@ -244,7 +284,9 @@ export function createSubscribersExportHandler(
 
       const csvHeader = '\uFEFFemail,language,subscribedAt,ip\n'
       const csvRows = allDocs
-        .map((s: any) => `${s.email},${s.language || ''},${s.subscribedAt || ''},${s.ip || ''}`)
+        .map((s: any) =>
+          [csvCell(s.email), csvCell(s.language), csvCell(s.subscribedAt), csvCell(s.ip)].join(','),
+        )
         .join('\n')
 
       return new Response(csvHeader + csvRows, {
@@ -267,19 +309,19 @@ export function createStatsHandler(
   historySlug: string = 'maintenance-history',
   enableSubscribers: boolean = true,
   enableHistory: boolean = true,
+  adminOptions: AdminAccessOptions = {},
 ): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     try {
       let subscribersCount = 0
       if (enableSubscribers) {
-        const subs = await req.payload.find({
-          collection: subscribersSlug as any,
-          limit: 0,
-        })
+        // `limit: 0` in Payload means "no pagination", not "no document": it
+        // loaded and hydrated the whole subscribers table just to read an int.
+        const subs = await req.payload.count({ collection: subscribersSlug as any })
         subscribersCount = subs.totalDocs
       }
 
@@ -339,10 +381,13 @@ export function createTrackViewHandler(analyticsSlug: string = 'maintenance-anal
 /**
  * Get analytics stats for maintenance page views (admin only).
  */
-export function createAnalyticsHandler(analyticsSlug: string = 'maintenance-analytics'): PayloadHandler {
+export function createAnalyticsHandler(
+  analyticsSlug: string = 'maintenance-analytics',
+  adminOptions: AdminAccessOptions = {},
+): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     try {
@@ -430,10 +475,13 @@ let scheduleCheckInProgress = false
  * Check scheduled maintenance and auto-toggle if needed (admin only).
  * Called by middleware or cron.
  */
-export function createScheduleCheckHandler(globalSlug: string): PayloadHandler {
+export function createScheduleCheckHandler(
+  globalSlug: string,
+  adminOptions: AdminAccessOptions = {},
+): PayloadHandler {
   return async (req) => {
-    if (!req.user) {
-      return Response.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
     }
 
     if (scheduleCheckInProgress) {

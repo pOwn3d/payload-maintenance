@@ -55,6 +55,55 @@ export const maintenancePlugin =
     const enableAnalytics = pluginConfig.enableAnalytics !== false
     const analyticsSlug = pluginConfig.analyticsSlug ?? 'maintenance-analytics'
     const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
+    const mediaSlug = pluginConfig.mediaCollectionSlug ?? 'media'
+    const excludedPaths = pluginConfig.excludedPaths ?? ['/admin', '/api']
+    const adminOptions = {
+      adminCollectionSlug: pluginConfig.adminCollectionSlug,
+      adminAccess: pluginConfig.adminAccess,
+    }
+
+    // These options were documented but never read by the plugin: they are
+    // middleware concerns and the middleware runs in another process, with no
+    // access to this config. Warn instead of failing silently — an integrator
+    // whitelisting their IP here would otherwise be locked out by their own
+    // maintenance page without a single message.
+    const middlewareOnlyOptions = [
+      ['allowedIPs', pluginConfig.allowedIPs],
+      ['bypassSecret', pluginConfig.bypassSecret],
+      ['bypassCookieName', pluginConfig.bypassCookieName],
+      ['authBypass', pluginConfig.authBypass],
+      ['maintenancePageComponent', pluginConfig.maintenancePageComponent],
+    ] as const
+    for (const [name, value] of middlewareOnlyOptions) {
+      if (value !== undefined) {
+        console.warn(
+          `[maintenance] Plugin option "${name}" is not read by the plugin and has no effect. ` +
+            `Pass it to createMaintenanceMiddleware() in your middleware.ts instead.`,
+        )
+      }
+    }
+
+    // `usersCollectionSlug` is in the same family, but louder: it is the option
+    // an existing install is most likely to have set (its only documented use
+    // was the middleware bypass), so it must NOT be promoted into the admin
+    // authorization gate — a value that is not the host's admin collection
+    // would lock its own admins out of the global and answer 401 on /toggle.
+    // The gate reads `adminCollectionSlug`, which defaults to `config.admin.user`.
+    if (pluginConfig.usersCollectionSlug !== undefined) {
+      const hostAdminCollection = (incomingConfig.admin?.user as string | undefined) ?? 'users'
+      const differs = pluginConfig.usersCollectionSlug !== hostAdminCollection
+      console.warn(
+        `[maintenance] Plugin option "usersCollectionSlug" is not read by the plugin and has no ` +
+          `effect. It only configures the Next.js middleware auth bypass: pass it to ` +
+          `createMaintenanceMiddleware({ usersCollectionSlug }). The admin authorization gate ` +
+          `uses "adminCollectionSlug" (default: config.admin.user = "${hostAdminCollection}")` +
+          (differs
+            ? ` — yours is "${pluginConfig.usersCollectionSlug}", which is NOT that collection, ` +
+              `so set "adminCollectionSlug" explicitly if you meant to change who administers ` +
+              `maintenance mode.`
+            : `.`),
+      )
+    }
 
     // 1. Merge i18n translations
     config.i18n = {
@@ -104,12 +153,12 @@ export const maintenancePlugin =
       {
         path: `${basePath}/status`,
         method: 'get' as const,
-        handler: createStatusHandler(globalSlug, pluginConfig.trustProxy),
+        handler: createStatusHandler(globalSlug, pluginConfig.trustProxy, mediaSlug, excludedPaths),
       },
       {
         path: `${basePath}/toggle`,
         method: 'post' as const,
-        handler: createToggleHandler(globalSlug),
+        handler: createToggleHandler(globalSlug, adminOptions),
       },
       {
         path: `${basePath}/newsletter`,
@@ -119,7 +168,7 @@ export const maintenancePlugin =
       {
         path: `${basePath}/stats`,
         method: 'get' as const,
-        handler: createStatsHandler(subscribersSlug, historySlug, enableSubscribers, enableHistory),
+        handler: createStatsHandler(subscribersSlug, historySlug, enableSubscribers, enableHistory, adminOptions),
       },
     ]
 
@@ -128,7 +177,7 @@ export const maintenancePlugin =
         {
           path: `${basePath}/subscribers/export`,
           method: 'get' as const,
-          handler: createSubscribersExportHandler(subscribersSlug),
+          handler: createSubscribersExportHandler(subscribersSlug, adminOptions),
         },
         {
           path: `${basePath}/unsubscribe`,
@@ -148,7 +197,7 @@ export const maintenancePlugin =
         {
           path: `${basePath}/analytics`,
           method: 'get' as const,
-          handler: createAnalyticsHandler(analyticsSlug),
+          handler: createAnalyticsHandler(analyticsSlug, adminOptions),
         },
       )
     }
@@ -157,7 +206,7 @@ export const maintenancePlugin =
       config.endpoints.push({
         path: `${basePath}/schedule-check`,
         method: 'post' as const,
-        handler: createScheduleCheckHandler(globalSlug),
+        handler: createScheduleCheckHandler(globalSlug, adminOptions),
       })
     }
 
@@ -190,7 +239,7 @@ export const maintenancePlugin =
       {
         path: `${basePath}/presets/apply`,
         method: 'post' as const,
-        handler: createApplyPresetHandler(globalSlug),
+        handler: createApplyPresetHandler(globalSlug, adminOptions),
       },
     )
 
