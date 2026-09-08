@@ -1,6 +1,7 @@
 import type { FieldAccess, GlobalConfig } from 'payload'
 import type { MaintenancePluginConfig } from '../types.js'
 import { isMaintenanceAdmin } from '../utils/access.js'
+import { assertPublicHttpUrl } from '../utils/ssrf.js'
 
 export function createMaintenanceGlobal(
   pluginConfig: MaintenancePluginConfig = {},
@@ -15,6 +16,7 @@ export function createMaintenanceGlobal(
   const historySlug = pluginConfig.historySlug ?? 'maintenance-history'
   const enableHistory = pluginConfig.enableHistory !== false
   const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
+  const allowedWebhookHosts = pluginConfig.allowedWebhookHosts
   const adminOptions = {
     adminCollectionSlug: pluginConfig.adminCollectionSlug,
     adminAccess: pluginConfig.adminAccess,
@@ -85,7 +87,7 @@ export function createMaintenanceGlobal(
               if (webhooks?.length) {
                 for (const webhook of webhooks) {
                   if (!webhook.enabled || !webhook.url) continue
-                  fireWebhook(webhook, action, triggeredBy, req.payload.logger, req.payload, webhookLogsSlug, historySlug).catch(() => {})
+                  fireWebhook(webhook, action, triggeredBy, req.payload.logger, req.payload, webhookLogsSlug, historySlug, allowedWebhookHosts).catch(() => {})
                 }
               }
             } catch (e) {
@@ -671,7 +673,13 @@ export function createMaintenanceGlobal(
                             return 'Invalid URL format'
                           }
                         },
-                        admin: { width: '50%' },
+                        admin: {
+                          width: '50%',
+                          description: {
+                            en: 'Must be https:// — a plaintext http:// target is refused at send time (the TLS certificate is what stops a DNS record from redirecting the server to an internal address between the safety check and the request).',
+                            fr: 'Doit etre en https:// — une cible http:// en clair est refusee a l envoi (le certificat TLS est ce qui empeche un enregistrement DNS de rediriger le serveur vers une adresse interne entre le controle et la requete).',
+                          },
+                        },
                       },
                       {
                         name: 'enabled',
@@ -759,7 +767,7 @@ export function createMaintenanceGlobal(
 }
 
 // Webhook helper with exponential backoff retry (max 3 attempts)
-async function fireWebhook(
+export async function fireWebhook(
   webhook: { type: string; url: string },
   action: string,
   triggeredBy: string,
@@ -767,6 +775,9 @@ async function fireWebhook(
   payload?: any,
   webhookLogsSlug?: string,
   historySlug?: string,
+  allowedWebhookHosts?: string[],
+  /** Injected by the tests; defaults to `node:dns.lookup`. */
+  lookup?: (hostname: string) => Promise<string[]>,
 ) {
   const timestamp = new Date().toISOString()
   let body: string
@@ -783,15 +794,34 @@ async function fireWebhook(
     body = JSON.stringify({ action, triggeredBy, timestamp })
   }
 
-  // Validate URL before fetching
-  try {
-    const parsed = new URL(webhook.url)
-    if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') {
-      logger.error(`[maintenance] Webhook URL must use http(s): ${webhook.url}`)
-      return
+  // Validate the target before fetching. Checking only the protocol turned this
+  // into an SSRF proxy: the URL is administrator-supplied, the server resolves
+  // it from inside the private network, and up to 2000 bytes of the answer are
+  // persisted in the webhook logs — a readable exfiltration channel towards
+  // cloud metadata (169.254.169.254), localhost services or internal hosts.
+  const guard = await assertPublicHttpUrl(webhook.url, {
+    allowedHosts: allowedWebhookHosts,
+    lookup,
+  })
+  if (!guard.ok) {
+    logger.error(`[maintenance] Webhook target refused (${guard.reason}): ${webhook.url}`)
+    if (payload && webhookLogsSlug) {
+      payload
+        .create({
+          collection: webhookLogsSlug,
+          data: {
+            webhookUrl: webhook.url,
+            webhookType: webhook.type,
+            action,
+            status: 'failed',
+            statusCode: 0,
+            responseBody: `Refused before sending: ${guard.reason}`,
+            attempts: 0,
+            timestamp: new Date().toISOString(),
+          },
+        })
+        .catch(() => {})
     }
-  } catch {
-    logger.error(`[maintenance] Invalid webhook URL: ${webhook.url}`)
     return
   }
 
@@ -802,6 +832,23 @@ async function fireWebhook(
   let success = false
 
   for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    // Re-resolve the target before EVERY retry. The guard used to run once for
+    // the whole loop, so a record with a 0s TTL got three chances — spaced by
+    // the 1s/2s backoff — to flip to an internal address after being validated.
+    if (attempt > 1) {
+      const recheck = await assertPublicHttpUrl(webhook.url, {
+        allowedHosts: allowedWebhookHosts,
+        lookup,
+      })
+      if (!recheck.ok) {
+        lastResponseBody = `Refused before retry: ${recheck.reason}`
+        logger.error(
+          `[maintenance] Webhook target refused before retry ${attempt} (${recheck.reason}): ${webhook.url}`,
+        )
+        break
+      }
+    }
+
     const controller = new AbortController()
     const timeout = setTimeout(() => controller.abort(), 5000)
 
@@ -810,9 +857,22 @@ async function fireWebhook(
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body,
+        // Never follow a redirect: an allowed external host answering 302
+        // towards 169.254.169.254 would otherwise walk straight past the
+        // address check performed on the initial URL. Each hop would have to be
+        // re-validated, so the chain is simply refused.
+        redirect: 'manual',
         signal: controller.signal,
       })
       lastStatusCode = res.status
+      if (res.status >= 300 && res.status < 400) {
+        lastResponseBody = `Redirect refused (HTTP ${res.status})`
+        logger.warn(
+          `[maintenance] Webhook attempt ${attempt}/${maxAttempts} refused: target redirected (HTTP ${res.status})`,
+        )
+        clearTimeout(timeout)
+        break
+      }
       lastResponseBody = await res.text().catch(() => '')
 
       if (res.ok) {

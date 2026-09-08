@@ -142,6 +142,21 @@ export interface MaintenancePluginConfig {
   /** Trust proxy headers (x-forwarded-for, x-real-ip) for IP detection (default: true).
    *  Set to false when not behind a trusted reverse proxy to prevent IP spoofing. */
   trustProxy?: boolean
+
+  /** Number of reverse proxies that append to `x-forwarded-for` before the
+   *  request reaches the app (default: 1).
+   *  The client IP is read as `parts[length - trustedProxyHops]`: a conforming
+   *  proxy APPENDS the peer address, so the first element of the header is the
+   *  one the caller sent and must never be trusted. Raise this only if you run
+   *  several chained proxies (e.g. CDN + load balancer => 2). */
+  trustedProxyHops?: number
+
+  /** Optional allow-list of hostnames the webhook sender may contact
+   *  (e.g. `['hooks.slack.com', 'discord.com']`). Sub-domains match.
+   *  Private, loopback and link-local targets are refused regardless of this
+   *  option; the allow-list narrows things further for hosts that only expect
+   *  a known destination. */
+  allowedWebhookHosts?: string[]
 }
 
 export interface MaintenanceStatus {

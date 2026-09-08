@@ -54,6 +54,20 @@ const maintenanceOn = (extra: Record<string, unknown> = {}) => () =>
 const request = (path: string, headers: Record<string, string> = {}) =>
   new NextRequest(`https://site.test${path}`, { headers })
 
+/** Payload's auth cookie always carries a JWT; the middleware refuses anything
+ *  else without a network round-trip, so the fixtures must look like one. */
+const JWT_HEADER = 'eyJhbGciOiJIUzI1NiJ9' // {"alg":"HS256"}
+const GOOD_TOKEN = `${JWT_HEADER}.good-payload.c2lnbmF0dXJl`
+const CUSTOMER_TOKEN = `${JWT_HEADER}.customer-payload.c2lnbmF0dXJl`
+
+/** base64url of a JSON object, as a real JWT segment. */
+const segment = (value: unknown) =>
+  Buffer.from(JSON.stringify(value))
+    .toString('base64')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '')
+
 beforeEach(() => {
   vi.spyOn(console, 'warn').mockImplementation(() => {})
 })
@@ -190,15 +204,29 @@ describe('middleware — routes laissées ouvertes pendant la maintenance', () =
 })
 
 describe('middleware — dérogations', () => {
-  it('laisse passer le porteur du cookie de dérogation', async () => {
+  it('refuse un cookie de dérogation forgé, quelle que soit sa valeur', async () => {
+    // Régression MNT-02 : le cookie valait la chaîne littérale « true », donc
+    // `curl -H 'Cookie: maintenance-bypass=true'` traversait tout le mode
+    // maintenance. `httpOnly` empêche le JS de LIRE le cookie, jamais un client
+    // de l'ÉMETTRE.
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: 's3cret' })
+
+    for (const forged of ['true', '1', 'maybe', `${Date.now() + 60_000}.deadbeef`]) {
+      expect(
+        await middleware(request('/blog', { cookie: `maintenance-bypass=${forged}` })),
+      ).not.toBeNull()
+    }
+  })
+
+  it('n honore aucun cookie de dérogation quand aucun secret n est configuré', async () => {
     installFetch({ status: maintenanceOn() })
     const middleware = await makeMiddleware()
 
-    expect(await middleware(request('/blog', { cookie: 'maintenance-bypass=true' }))).toBeNull()
-    expect(await middleware(request('/blog', { cookie: 'maintenance-bypass=maybe' }))).not.toBeNull()
+    expect(await middleware(request('/blog', { cookie: 'maintenance-bypass=true' }))).not.toBeNull()
   })
 
-  it('échange le bon secret contre un cookie de dérogation de 24 h, et ignore un mauvais secret', async () => {
+  it('échange le bon secret contre un cookie signé de 24 h, et ignore un mauvais secret', async () => {
     installFetch({ status: maintenanceOn() })
     const middleware = await makeMiddleware({ bypassSecret: 's3cret' })
 
@@ -206,21 +234,81 @@ describe('middleware — dérogations', () => {
     expect(granted?.status).toBe(307)
     expect(granted?.headers.get('location')).toBe('https://site.test/blog')
     const cookie = granted?.headers.get('set-cookie') ?? ''
-    expect(cookie).toContain('maintenance-bypass=true')
     expect(cookie).toContain('HttpOnly')
     expect(cookie).toContain('Max-Age=86400')
+    // La valeur n'est plus un booléen devinable mais `<expiration>.<hmac>`.
+    expect(cookie).not.toContain('maintenance-bypass=true')
+    expect(cookie).toMatch(/maintenance-bypass=\d{13}\.[A-Za-z0-9_-]{20,}/)
 
     expect((await middleware(request('/blog?bypass=wrong')))?.status).toBe(503)
   })
 
-  it('ne laisse passer que les IP explicitement autorisées', async () => {
+  it('accepte ensuite le cookie qu il vient d émettre', async () => {
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: 's3cret' })
+
+    const granted = await middleware(request('/blog?bypass=s3cret'))
+    const value = /maintenance-bypass=([^;]+)/.exec(granted?.headers.get('set-cookie') ?? '')?.[1]
+    expect(value).toBeTruthy()
+    expect(
+      await middleware(request('/blog', { cookie: `maintenance-bypass=${value}` })),
+    ).toBeNull()
+  })
+
+  it('rejette un cookie signé dont l échéance est dépassée', async () => {
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: 's3cret' })
+    const { signBypassToken } = await import('../utils/bypassToken.js')
+
+    const expired = await signBypassToken('s3cret', Date.now() - 1000)
+    expect(
+      await middleware(request('/blog', { cookie: `maintenance-bypass=${expired}` })),
+    ).not.toBeNull()
+  })
+
+  it('n accepte pas un cookie signé avec un autre secret', async () => {
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: 's3cret' })
+    const { signBypassToken } = await import('../utils/bypassToken.js')
+
+    const foreign = await signBypassToken('autre-secret', Date.now() + 60_000)
+    expect(
+      await middleware(request('/blog', { cookie: `maintenance-bypass=${foreign}` })),
+    ).not.toBeNull()
+  })
+
+  it('lit l IP ajoutée par le proxy, pas celle que le visiteur a écrite lui-même', async () => {
+    // Régression MNT-03 : un proxy conforme AJOUTE l'adresse du pair, donc le
+    // PREMIER élément de X-Forwarded-For est exactement ce que le client a
+    // envoyé. Le lire laissait n'importe quel anonyme revendiquer une IP de la
+    // liste blanche avec `curl -H 'X-Forwarded-For: 203.0.113.10'`.
     installFetch({ status: maintenanceOn() })
     const middleware = await makeMiddleware({ allowedIPs: ['203.0.113.10'] })
 
+    // Le proxy a vu 203.0.113.10 : dérogation accordée.
+    expect(await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.10' }))).toBeNull()
+
+    // Le visiteur a préfixé l'en-tête ; le proxy a ajouté sa vraie adresse.
     expect(
-      await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.10, 10.0.0.1' })),
-    ).toBeNull()
+      await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.10, 198.51.100.9' })),
+    ).not.toBeNull()
+
     expect(await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.11' }))).not.toBeNull()
+  })
+
+  it('compte les sauts de proxy déclarés par le host', async () => {
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({
+      allowedIPs: ['203.0.113.10'],
+      trustedProxyHops: 2,
+    })
+
+    // CDN + load balancer : la vraie adresse est l'avant-dernière.
+    expect(
+      await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.10, 10.0.0.7' })),
+    ).toBeNull()
+    // Chaîne plus courte que déclarée : on ne fait confiance à rien.
+    expect(await middleware(request('/blog', { 'x-forwarded-for': '203.0.113.10' }))).not.toBeNull()
   })
 
   it('ignore les en-têtes de proxy quand le proxy n est pas de confiance', async () => {
@@ -233,6 +321,35 @@ describe('middleware — dérogations', () => {
   })
 })
 
+describe('middleware — cache de validation des jetons', () => {
+  it('ne contacte pas Payload pour un jeton qui ne peut pas être un JWT', async () => {
+    // Régression MNT-07 : chaque jeton inédit déclenchait un /me interne et
+    // insérait une entrée jamais purgée dans un cache module-level.
+    const { calls } = installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware()
+
+    expect(
+      await middleware(request('/blog', { cookie: 'payload-token=Zm9vYmFyYmF6' })),
+    ).not.toBeNull()
+    expect(calls.some((url) => url.endsWith('/me'))).toBe(false)
+  })
+
+  it('borne le cache face à un flot de jetons aléatoires', async () => {
+    installFetch({ status: maintenanceOn(), me: () => Response.json({ user: null }) })
+    vi.resetModules()
+    const mod = await import('../middleware/maintenanceMiddleware.js')
+    const middleware = mod.createMaintenanceMiddleware({ cacheDuration: 0 })
+
+    for (let i = 0; i < 1200; i++) {
+      // Jetons de forme valide : c'est le flot que le plafond doit encaisser.
+      await middleware(request('/blog', { cookie: `payload-token=${JWT_HEADER}.tok${i}.sig` }))
+    }
+    expect(mod.__authTokenCacheSize()).toBeLessThanOrEqual(1000)
+    // 1200 allers-retours séquentiels : c'est un test de charge, pas un test
+    // unitaire, d'où le délai explicite.
+  }, 20_000)
+})
+
 describe('middleware — dérogation des utilisateurs connectés', () => {
   const meAnswers = (validFor: { slug: string; token: string }) => (url: string, init: RequestInit | undefined) => {
     const cookie = String((init?.headers as Record<string, string> | undefined)?.Cookie ?? '')
@@ -242,29 +359,29 @@ describe('middleware — dérogation des utilisateurs connectés', () => {
   }
 
   it('laisse passer un compte de la collection d administration', async () => {
-    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'users', token: 'good-token' }) })
+    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'users', token: GOOD_TOKEN }) })
     const middleware = await makeMiddleware()
-    expect(await middleware(request('/blog', { cookie: 'payload-token=good-token' }))).toBeNull()
+    expect(await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).toBeNull()
   })
 
   it('bloque un compte que Payload ne reconnaît pas sur cette collection', async () => {
     // C'est ce qui empêche un client d'un espace client de contourner la
     // maintenance : /api/users/me répond `{ user: null }` pour son jeton.
-    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'users', token: 'good-token' }) })
+    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'users', token: GOOD_TOKEN }) })
     const middleware = await makeMiddleware()
     expect(
-      await middleware(request('/blog', { cookie: 'payload-token=customer-token' })),
+      await middleware(request('/blog', { cookie: `payload-token=${CUSTOMER_TOKEN}` })),
     ).not.toBeNull()
   })
 
   it('interroge la collection d administration configurée par le host', async () => {
-    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'staff', token: 'good-token' }) })
+    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'staff', token: GOOD_TOKEN }) })
     const onStaff = await makeMiddleware({ usersCollectionSlug: 'staff' })
-    expect(await onStaff(request('/blog', { cookie: 'payload-token=good-token' }))).toBeNull()
+    expect(await onStaff(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).toBeNull()
 
-    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'staff', token: 'good-token' }) })
+    installFetch({ status: maintenanceOn(), me: meAnswers({ slug: 'staff', token: GOOD_TOKEN }) })
     const onDefault = await makeMiddleware()
-    expect(await onDefault(request('/blog', { cookie: 'payload-token=good-token' }))).not.toBeNull()
+    expect(await onDefault(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).not.toBeNull()
   })
 
   it('renvoie le jeton sous le nom de cookie configuré', async () => {
@@ -278,7 +395,7 @@ describe('middleware — dérogation des utilisateurs connectés', () => {
       },
     })
     const middleware = await makeMiddleware({ authCookieName: 'mysite-token' })
-    expect(await middleware(request('/blog', { cookie: 'mysite-token=good-token' }))).toBeNull()
+    expect(await middleware(request('/blog', { cookie: `mysite-token=${GOOD_TOKEN}` }))).toBeNull()
   })
 
   // BUG EXPOSÉ — `validateAuthToken` annonce dans son commentaire « Network error
@@ -302,21 +419,21 @@ describe('middleware — dérogation des utilisateurs connectés', () => {
       const middleware = await makeMiddleware()
 
       expect(
-        await middleware(request('/blog', { cookie: 'payload-token=good-token' })),
+        await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` })),
       ).not.toBeNull()
 
       meDown = false
-      expect(await middleware(request('/blog', { cookie: 'payload-token=good-token' }))).toBeNull()
+      expect(await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).toBeNull()
     },
   )
 
   it('bloque même un administrateur quand le bypass authentifié est coupé côté global', async () => {
     installFetch({
       status: maintenanceOn({ authBypass: false }),
-      me: meAnswers({ slug: 'users', token: 'good-token' }),
+      me: meAnswers({ slug: 'users', token: GOOD_TOKEN }),
     })
     const middleware = await makeMiddleware()
-    expect(await middleware(request('/blog', { cookie: 'payload-token=good-token' }))).not.toBeNull()
+    expect(await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).not.toBeNull()
   })
 })
 
@@ -419,4 +536,136 @@ describe('middleware — planification', () => {
     const middleware = await makeMiddleware()
     expect(await middleware(request('/blog'))).toBeNull()
   })
+})
+
+describe('MNT2-02 — le compteur du ?bypass= ne doit pas être un interrupteur', () => {
+  const SECRET = 'r6TqjW-secret-de-contournement'
+
+  it('un anonyme qui martèle ne verrouille pas le lien de l exploitant', async () => {
+    // Le durcissement comptait aussi dans un seau global `__all__` (100/min) :
+    // 100 requêtes anonymes suffisaient à faire refuser le VRAI secret, et cette
+    // tentative légitime était en plus comptée comme un échec.
+    const { fetchMock } = installFetch({ status: maintenanceOn() })
+    void fetchMock
+    const middleware = await makeMiddleware({ bypassSecret: SECRET })
+
+    for (let i = 0; i < 300; i++) {
+      await middleware(request(`/?bypass=faux${i}`, { 'x-forwarded-for': '203.0.113.5' }))
+    }
+
+    const res = await middleware(
+      request(`/?bypass=${SECRET}`, { 'x-forwarded-for': '198.51.100.7' }),
+    )
+    expect(res).not.toBeNull()
+    expect(res!.status).toBe(307)
+    expect(res!.cookies.get('maintenance-bypass')?.value).toBeTruthy()
+  })
+
+  it('ne partage pas un seau « unknown » entre tous les appelants non identifiables', async () => {
+    // Sans proxy renseignant x-forwarded-for, `resolveClientIP` renvoie '' :
+    // l'ancienne clé de repli `'unknown'` était commune à tout le monde, donc
+    // 10 requêtes suffisaient à fermer le contournement pour l'exploitant.
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: SECRET })
+
+    for (let i = 0; i < 50; i++) {
+      await middleware(request(`/?bypass=faux${i}`))
+    }
+
+    const res = await middleware(request(`/?bypass=${SECRET}`))
+    expect(res!.status).toBe(307)
+    expect(res!.cookies.get('maintenance-bypass')?.value).toBeTruthy()
+  })
+
+  it('borne quand même le brute-force d une IP identifiable', async () => {
+    // La contrepartie : un appelant qu'on sait nommer reste limité à 10 échecs
+    // par minute — un budget que lui seul peut dépenser.
+    installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware({ bypassSecret: SECRET })
+
+    for (let i = 0; i < 10; i++) {
+      await middleware(request(`/?bypass=faux${i}`, { 'x-forwarded-for': '203.0.113.42' }))
+    }
+
+    const bloque = await middleware(
+      request(`/?bypass=${SECRET}`, { 'x-forwarded-for': '203.0.113.42' }),
+    )
+    expect(bloque!.status).not.toBe(307)
+
+    // …et une autre IP, elle, n'a rien dépensé.
+    const autre = await middleware(
+      request(`/?bypass=${SECRET}`, { 'x-forwarded-for': '203.0.113.43' }),
+    )
+    expect(autre!.status).toBe(307)
+  })
+})
+
+describe('MNT2-04 — amplification vers /me et éviction du cache', () => {
+  it('ne contacte pas Payload pour un jeton dont l échéance est déjà passée', async () => {
+    const expire = `${segment({ alg: 'HS256', typ: 'JWT' })}.${segment({
+      exp: Math.floor(Date.now() / 1000) - 3600,
+    })}.c2ln`
+    const { calls } = installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware()
+
+    expect(await middleware(request('/blog', { cookie: `payload-token=${expire}` }))).not.toBeNull()
+    expect(calls.some((url) => url.endsWith('/me'))).toBe(false)
+  })
+
+  it('ne contacte pas Payload quand l en-tête du jeton n est pas un en-tête JWT', async () => {
+    const { calls } = installFetch({ status: maintenanceOn() })
+    const middleware = await makeMiddleware()
+
+    // Forme à trois segments, mais premier segment qui ne décode pas en JSON
+    // porteur d'un `alg` : c'est exactement le `head -c 24 /dev/urandom` du
+    // scénario, qui traversait le filtre purement syntaxique.
+    await middleware(request('/blog', { cookie: 'payload-token=cGFzLWpzb24.tok.sig' }))
+    expect(calls.some((url) => url.endsWith('/me'))).toBe(false)
+  })
+
+  it('borne les allers-retours /me par IP identifiable', async () => {
+    const { calls } = installFetch({ status: maintenanceOn(), me: () => Response.json({ user: null }) })
+    const middleware = await makeMiddleware()
+
+    for (let i = 0; i < 200; i++) {
+      await middleware(
+        request('/blog', {
+          cookie: `payload-token=${JWT_HEADER}.flood${i}.sig`,
+          'x-forwarded-for': '203.0.113.77',
+        }),
+      )
+    }
+
+    const meCalls = calls.filter((url) => url.endsWith('/me')).length
+    expect(meCalls).toBeGreaterThan(0)
+    expect(meCalls).toBeLessThanOrEqual(31)
+  })
+
+  it('un flot de jetons inconnus n évince pas la session validée d un administrateur', async () => {
+    // Le plafond FIFO introduit par le durcissement était commun aux réponses
+    // positives et négatives : 1000 jetons anonymes chassaient les entrées
+    // `valid: true` des vrais administrateurs, renvoyés en /me à chaque page.
+    const meFor = (token: string) => (_url: string, init: RequestInit | undefined) => {
+      const cookie = String((init?.headers as Record<string, string> | undefined)?.Cookie ?? '')
+      return Response.json({ user: cookie.includes(token) ? { id: 1 } : null })
+    }
+    const { calls } = installFetch({ status: maintenanceOn(), me: meFor(GOOD_TOKEN) })
+    vi.resetModules()
+    const mod = await import('../middleware/maintenanceMiddleware.js')
+    const middleware = mod.createMaintenanceMiddleware({ cacheDuration: 0 })
+
+    expect(await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).toBeNull()
+    expect(mod.__authPositiveCacheSize()).toBe(1)
+
+    for (let i = 0; i < 1200; i++) {
+      await middleware(request('/blog', { cookie: `payload-token=${JWT_HEADER}.evict${i}.sig` }))
+    }
+
+    // L'entrée positive est toujours là, et l'administrateur repasse sans que le
+    // middleware ait à redemander /me.
+    expect(mod.__authPositiveCacheSize()).toBe(1)
+    const avant = calls.filter((url) => url.endsWith('/me')).length
+    expect(await middleware(request('/blog', { cookie: `payload-token=${GOOD_TOKEN}` }))).toBeNull()
+    expect(calls.filter((url) => url.endsWith('/me')).length).toBe(avant)
+  }, 20_000)
 })

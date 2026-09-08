@@ -123,28 +123,28 @@ export const maintenancePlugin =
     if (enableSubscribers) {
       config.collections = [
         ...config.collections,
-        createSubscribersCollection(subscribersSlug),
+        createSubscribersCollection(subscribersSlug, adminOptions),
       ]
     }
 
     if (enableHistory) {
       config.collections = [
         ...config.collections,
-        createHistoryCollection(historySlug),
+        createHistoryCollection(historySlug, adminOptions),
       ]
     }
 
     if (enableAnalytics) {
       config.collections = [
         ...config.collections,
-        createAnalyticsCollection(analyticsSlug),
+        createAnalyticsCollection(analyticsSlug, adminOptions),
       ]
     }
 
     // Always add webhook logs collection
     config.collections = [
       ...config.collections,
-      createWebhookLogsCollection(webhookLogsSlug),
+      createWebhookLogsCollection(webhookLogsSlug, adminOptions),
     ]
 
     // 4. Add API endpoints
@@ -153,7 +153,13 @@ export const maintenancePlugin =
       {
         path: `${basePath}/status`,
         method: 'get' as const,
-        handler: createStatusHandler(globalSlug, pluginConfig.trustProxy, mediaSlug, excludedPaths),
+        handler: createStatusHandler(
+          globalSlug,
+          pluginConfig.trustProxy,
+          mediaSlug,
+          excludedPaths,
+          pluginConfig.trustedProxyHops,
+        ),
       },
       {
         path: `${basePath}/toggle`,
@@ -163,7 +169,13 @@ export const maintenancePlugin =
       {
         path: `${basePath}/newsletter`,
         method: 'post' as const,
-        handler: createNewsletterHandler(globalSlug, subscribersSlug, enableSubscribers),
+        handler: createNewsletterHandler(
+          globalSlug,
+          subscribersSlug,
+          enableSubscribers,
+          pluginConfig.trustProxy,
+          pluginConfig.trustedProxyHops,
+        ),
       },
       {
         path: `${basePath}/stats`,
@@ -182,7 +194,11 @@ export const maintenancePlugin =
         {
           path: `${basePath}/unsubscribe`,
           method: 'get' as const,
-          handler: createUnsubscribeHandler(subscribersSlug),
+          handler: createUnsubscribeHandler(
+            subscribersSlug,
+            pluginConfig.trustProxy,
+            pluginConfig.trustedProxyHops,
+          ),
         },
       )
     }
@@ -192,7 +208,11 @@ export const maintenancePlugin =
         {
           path: `${basePath}/track`,
           method: 'post' as const,
-          handler: createTrackViewHandler(analyticsSlug),
+          handler: createTrackViewHandler(
+            analyticsSlug,
+            pluginConfig.trustProxy,
+            pluginConfig.trustedProxyHops,
+          ),
         },
         {
           path: `${basePath}/analytics`,

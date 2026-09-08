@@ -55,7 +55,13 @@ Since 0.6.0 the plugin is admin-only and fails closed: the configuration global 
 - **Auth cookie validation** — the middleware validates the Payload token against `/api/<usersCollectionSlug>/me` (positive and negative answers cached 15s; transient failures are not cached).
 - **Input validation** — email regex on signup, IANA timezone, schedule cross-field (end after start), custom CSS rejecting `script`/`iframe`, preset ID whitelist, UUID check on unsubscribe.
 - **CSV export hardening** — every cell quoted, and formula-injection prefixes (`=`, `+`, `-`, `@`, tab, CR) neutralised.
-- **`trustProxy`** — control whether `x-forwarded-for` / `x-real-ip` is trusted for IP resolution. The plugin option is wired to `GET /status` only; the newsletter, track and unsubscribe rate limits always read the header. The middleware has its own `trustProxy`, which governs the `allowedIPs` check.
+- **`trustProxy` / `trustedProxyHops`** — control whether `x-forwarded-for` / `x-real-ip` is trusted, and which entry of the chain is the real client. The plugin option now reaches every rate-limited endpoint (`/status`, `/newsletter`, `/track`, `/unsubscribe`); the middleware has its own pair, which governs the `allowedIPs` check.
+- **SSRF guard on webhooks** — a webhook URL that resolves to a loopback, RFC1918, CGNAT or link-local address (including its IPv4-mapped IPv6 form, `::ffff:10.0.0.1`) is refused before the request leaves, redirects are never followed, and `allowedWebhookHosts` narrows the destinations further. The target is **re-resolved before every retry**, and **webhook URLs must be `https://`**: the guard resolves the name itself and `fetch` then resolves it again, so a record with a 0s TTL can swap in an internal address between the two. Over TLS the certificate is the pin — an internal service cannot present one valid for the configured hostname — which plaintext `http://` does not offer. `allowedWebhookHosts` remains the only control that does not depend on that reasoning: set it (`['hooks.slack.com', 'discord.com']`) whenever you can.
+- **Signed bypass cookie** — the cookie carries `<expiry>.<HMAC-SHA256>` instead of the string `true`, is only accepted when a `bypassSecret` is configured, and both it and `?bypass=` are compared in constant time.
+- **Throttles keyed by caller, never globally** — wrong `?bypass=` values and unknown auth cookies are counted per resolved client IP (10/min and 30/min). There is deliberately no global bucket and no shared `unknown` bucket: one would let any anonymous visitor exhaust it and lock the operator out of their own bypass. A caller whose IP cannot be resolved is therefore not throttled on these two paths — configure `trustProxy` / `trustedProxyHops`, and use a high-entropy `bypassSecret`.
+- **Auth cache split in two zones** — validated sessions and rejected tokens are capped separately (500 each), so a flood of unknown cookies cannot evict the entries of signed-in admins.
+- **Sandboxed custom HTML** — `customHTML` / `customCSS` are rendered inside an `iframe sandbox=""` (opaque origin, scripting disabled), so a stored payload cannot execute on the site's origin.
+- **Admin-only collections** — the four plugin collections (`subscribers`, `history`, `analytics`, `webhook-logs`) answer `read` / `create` / `update` / `delete` only for the admin collection (or your `adminAccess`), never for any authenticated user of another auth collection.
 - **Segment-boundary path matching** — `excludedPaths: ['/admin']` no longer leaves `/administration-des-ventes` online.
 
 ## Installation
@@ -179,7 +185,9 @@ Everything passed to `maintenancePlugin()`. The deprecated options below still c
 | `enableScheduling` | `boolean` | `true` | Add scheduled maintenance and the `schedule-check` endpoint |
 | `adminCollectionSlug` | `string` | Payload's admin collection (`config.admin.user`) | Collection whose users may administer maintenance mode: toggle, stats, export, analytics, presets, and read/update the global |
 | `adminAccess` | `({ req }) => boolean \| Promise<boolean>` | `undefined` | Custom authorization check for the admin endpoints and the global. Overrides `adminCollectionSlug` — plug your own RBAC here |
-| `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP for the **`GET /status`** rate limit. Set `false` when not behind a trusted reverse proxy — note it does not reach the newsletter, track and unsubscribe rate limits, which still trust the header |
+| `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP. Now forwarded to **every** rate-limited endpoint (`/status`, `/newsletter`, `/track`, `/unsubscribe`). Set `false` when not behind a trusted reverse proxy |
+| `trustedProxyHops` | `number` | `1` | How many reverse proxies append to `x-forwarded-for`. The client IP is read as `parts[length - trustedProxyHops]`, because a conforming proxy **appends** the peer address — the first element of the header is whatever the caller sent. Use `2` for CDN + load balancer |
+| `allowedWebhookHosts` | `string[]` | `undefined` | Allow-list of hostnames the webhook sender may contact (sub-domains match). **Recommended** — it is the only SSRF control that does not depend on DNS timing. Private, loopback, link-local and plaintext `http://` targets are refused regardless of this option |
 | ~~`allowedIPs`~~ | `string[]` | `[]` | **Deprecated — no effect.** The IP check runs in the Next.js middleware: pass it to `createMaintenanceMiddleware({ allowedIPs })` |
 | ~~`bypassSecret`~~ | `string` | `undefined` | **Deprecated — no effect.** Pass it to `createMaintenanceMiddleware({ bypassSecret })` |
 | ~~`bypassCookieName`~~ | `string` | `'maintenance-bypass'` | **Deprecated — no effect.** The cookie is set and read by the middleware: `createMaintenanceMiddleware({ bypassCookieName })` |
@@ -203,9 +211,11 @@ Everything passed to `createMaintenanceMiddleware()`.
 | `authCookieName` | `string` | `'payload-token'` | Payload auth cookie name |
 | `usersCollectionSlug` | `string` | `'users'` | Collection queried to validate the auth cookie — must be the Payload admin collection |
 | `bypassCookieName` | `string` | `'maintenance-bypass'` | Bypass cookie name |
-| `bypassSecret` | `string` | `undefined` | Enables `?bypass=SECRET`, which sets a 24h cookie. Server-side only, never exposed by the API |
-| `allowedIPs` | `string[]` | `[]` | IPs that bypass maintenance. Server-side only, never exposed by the API |
+| `bypassSecret` | `string` | `undefined` | Enables `?bypass=SECRET`, which sets a 24h **signed** cookie (HMAC-SHA256 over the expiry). Without it, no bypass cookie is ever honoured. Compared in constant time; failed attempts are throttled. Server-side only, never exposed by the API |
+| `allowedIPs` | `string[]` | `[]` | IPs that bypass maintenance. Only meaningful behind a proxy that rewrites `x-forwarded-for` — see `trustedProxyHops`. Server-side only, never exposed by the API |
 | `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP for the `allowedIPs` check. Distinct from the plugin option of the same name |
+| `trustedProxyHops` | `number` | `1` | Number of reverse proxies appending to `x-forwarded-for`. The trusted value is the entry the closest proxy added, not the first element of the header |
+| `bypassCookieMaxAge` | `number` | `86400` | Lifetime of the bypass cookie, in seconds. The cookie carries a signed, expiring proof — never a boolean |
 
 ## Templates
 
@@ -305,7 +315,7 @@ Subscribers, history and analytics are only added when their `enable*` option is
 
 | Method | How |
 |--------|-----|
-| **Bypass cookie** | Visit `?bypass=YOUR_SECRET`, which sets a 24h cookie. Requires `createMaintenanceMiddleware({ bypassSecret })` — the admin field alone is **not** read by the middleware |
+| **Bypass cookie** | Visit `?bypass=YOUR_SECRET`, which sets a 24h signed cookie. Requires `createMaintenanceMiddleware({ bypassSecret })` — the admin field alone is **not** read by the middleware. Without a configured secret, no bypass cookie is accepted |
 | **IP whitelist** | Requires `createMaintenanceMiddleware({ allowedIPs })` — the admin field alone is **not** read by the middleware |
 | **Auth bypass** | Logged-in users of the collection given by the middleware's `usersCollectionSlug` see the real site. Enabled by the `authBypass` checkbox on the global and the middleware's `authBypass` option |
 | **Route exclusion** | List routes (`/pricing`, `/legal/*`) in the global's "Excluded routes" field |
