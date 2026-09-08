@@ -139,3 +139,39 @@ describe('page /maintenance — HTML personnalisé', () => {
     expect(code).not.toContain('onmouseleave=')
   })
 })
+
+describe('page /maintenance — accessibilité du formulaire newsletter', () => {
+  /** La feuille de style est servie inline dans le <head> de la page. */
+  const servedHtml = async (): Promise<string> => {
+    const handler = createMaintenancePageHandler('/maintenance') as PayloadHandler
+    const res = await (handler as unknown as (req: unknown) => Promise<Response>)({})
+    return res.text()
+  }
+
+  it('ne supprime plus l indicateur de focus du champ email', async () => {
+    // RGAA 10.7 / WCAG 2.4.7 : `outline:none` sans remplacement rendait le champ
+    // impossible à situer au clavier. Ici c'est du CSS, donc il reçoit un vrai
+    // indicateur plutôt qu un simple retour au défaut navigateur.
+    const html = await servedHtml()
+    const rule = /\.m-newsletter input\{[^}]*\}/.exec(html)
+    expect(rule).not.toBeNull()
+    expect(rule![0]).not.toContain('outline:none')
+    expect(html).toContain('.m-newsletter input:focus-visible{outline:2px solid currentColor')
+  })
+
+  it('donne un nom accessible au champ email dans les 10 langues', async () => {
+    // Un `placeholder` n'est pas un nom accessible : il n est pas exposé comme
+    // tel et disparaît à la première frappe. C'est l unique contrôle de
+    // formulaire du plugin, et il n en avait aucun.
+    const code = await inlineScript()
+    const newsletter = extractFunction(code, 'newsletterHTML')
+    expect(newsletter).toContain("aria-label=")
+    expect(newsletter).toContain("t(currentLang,'emailLabel')")
+
+    const html = await servedHtml()
+    for (const lang of ['fr', 'en', 'de', 'es', 'it', 'pt', 'nl', 'ja', 'ar', 'zh']) {
+      const block = new RegExp(`\\n    ${lang}: \\{[^\\n]*emailLabel:'[^']+'`).test(html)
+      expect(block, `emailLabel manquant pour ${lang}`).toBe(true)
+    }
+  })
+})

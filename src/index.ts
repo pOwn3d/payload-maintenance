@@ -16,7 +16,18 @@ export {
   createAnalyticsHandler,
   createUnsubscribeHandler,
 } from './endpoints/status.js'
+export { createRetentionPurgeHandler } from './endpoints/status.js'
 export { rateLimit, rateLimitResponse } from './utils/rateLimiter.js'
+// Exported so a host that already runs its own scheduler can call the sweep
+// directly instead of going through the HTTP endpoint.
+export {
+  runRetentionPurge,
+  DEFAULT_ANALYTICS_RETENTION_DAYS,
+} from './utils/retention.js'
+export type { RetentionOptions, RetentionReport } from './utils/retention.js'
+export { anonymizeIp } from './utils/anonymizeIp.js'
+export type { AnalyticsIpMode } from './utils/anonymizeIp.js'
+export { RETENTION_TASK_SLUG } from './plugin.js'
 export { isMaintenanceAdmin } from './utils/access.js'
 export type { AdminAccessCheck, AdminAccessOptions } from './utils/access.js'
 export { getNowInTimezone } from './utils/timezone.js'

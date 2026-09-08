@@ -140,7 +140,13 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
 /* Newsletter */
 .m-newsletter{display:flex;gap:.5rem;width:100%;max-width:440px;margin-bottom:1.5rem}
-.m-newsletter input{flex:1;padding:.7rem 1rem;border-radius:.5rem;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);font-size:.9rem;outline:none;backdrop-filter:blur(8px);transition:border-color .2s}
+.m-newsletter input{flex:1;padding:.7rem 1rem;border-radius:.5rem;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.06);font-size:.9rem;backdrop-filter:blur(8px);transition:border-color .2s}
+/* outline:none used to be in the rule above, with nothing put back: a keyboard
+   user had no way to tell the field was focused. Unlike the inline style on the
+   React renderer, CSS can carry a real replacement, so this one gets a designed
+   ring rather than just the browser default. currentColor follows the
+   configured text colour, which is readable on the configured background. */
+.m-newsletter input:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .m-newsletter button{padding:.7rem 1.5rem;border-radius:.5rem;border:none;color:#fff;font-weight:600;font-size:.9rem;cursor:pointer;white-space:nowrap;transition:transform .15s,opacity .2s}
 .m-newsletter button:hover{transform:scale(1.02)}
 
@@ -186,16 +192,16 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
 
   // ─── i18n ───
   var i18n = {
-    fr: { days:'Jours',hours:'Heures',minutes:'Minutes',seconds:'Secondes',returnDate:'Retour prévu le',contact:'Nous contacter',newsletterSuccess:'Merci ! Vous serez notifié(e) du retour du site.',newsletterError:'Une erreur est survenue.',followUs:'Suivez-nous',loading:'Chargement...' },
-    en: { days:'Days',hours:'Hours',minutes:'Minutes',seconds:'Seconds',returnDate:'Expected return on',contact:'Contact us',newsletterSuccess:'Thank you! You will be notified when the site is back.',newsletterError:'An error occurred. Please try again.',followUs:'Follow us',loading:'Loading...' },
-    de: { days:'Tage',hours:'Stunden',minutes:'Minuten',seconds:'Sekunden',returnDate:'Voraussichtliche Rückkehr am',contact:'Kontaktieren Sie uns',newsletterSuccess:'Danke! Sie werden benachrichtigt.',newsletterError:'Ein Fehler ist aufgetreten.',followUs:'Folgen Sie uns',loading:'Laden...' },
-    es: { days:'Días',hours:'Horas',minutes:'Minutos',seconds:'Segundos',returnDate:'Regreso previsto el',contact:'Contáctenos',newsletterSuccess:'¡Gracias! Le notificaremos.',newsletterError:'Ha ocurrido un error.',followUs:'Síguenos',loading:'Cargando...' },
-    it: { days:'Giorni',hours:'Ore',minutes:'Minuti',seconds:'Secondi',returnDate:'Ritorno previsto il',contact:'Contattaci',newsletterSuccess:'Grazie! Sarai avvisato.',newsletterError:'Si è verificato un errore.',followUs:'Seguici',loading:'Caricamento...' },
-    pt: { days:'Dias',hours:'Horas',minutes:'Minutos',seconds:'Segundos',returnDate:'Retorno previsto em',contact:'Contacte-nos',newsletterSuccess:'Obrigado! Será notificado.',newsletterError:'Ocorreu um erro.',followUs:'Siga-nos',loading:'Carregando...' },
-    nl: { days:'Dagen',hours:'Uren',minutes:'Minuten',seconds:'Seconden',returnDate:'Verwachte terugkeer op',contact:'Neem contact op',newsletterSuccess:'Bedankt! U wordt op de hoogte gebracht.',newsletterError:'Er is een fout opgetreden.',followUs:'Volg ons',loading:'Laden...' },
-    ja: { days:'日',hours:'時間',minutes:'分',seconds:'秒',returnDate:'復旧予定日',contact:'お問い合わせ',newsletterSuccess:'ありがとうございます！',newsletterError:'エラーが発生しました。',followUs:'フォロー',loading:'読み込み中...' },
-    ar: { days:'أيام',hours:'ساعات',minutes:'دقائق',seconds:'ثوانٍ',returnDate:'تاريخ العودة المتوقع',contact:'اتصل بنا',newsletterSuccess:'شكراً لك!',newsletterError:'حدث خطأ.',followUs:'تابعنا',loading:'جار التحميل...' },
-    zh: { days:'天',hours:'小时',minutes:'分钟',seconds:'秒',returnDate:'预计恢复日期',contact:'联系我们',newsletterSuccess:'谢谢！',newsletterError:'发生错误。',followUs:'关注我们',loading:'加载中...' }
+    fr: { days:'Jours',hours:'Heures',minutes:'Minutes',seconds:'Secondes',returnDate:'Retour prévu le',contact:'Nous contacter',newsletterSuccess:'Merci ! Vous serez notifié(e) du retour du site.',newsletterError:'Une erreur est survenue.',emailLabel:'Votre adresse email',followUs:'Suivez-nous',loading:'Chargement...' },
+    en: { days:'Days',hours:'Hours',minutes:'Minutes',seconds:'Seconds',returnDate:'Expected return on',contact:'Contact us',newsletterSuccess:'Thank you! You will be notified when the site is back.',newsletterError:'An error occurred. Please try again.',emailLabel:'Your email address',followUs:'Follow us',loading:'Loading...' },
+    de: { days:'Tage',hours:'Stunden',minutes:'Minuten',seconds:'Sekunden',returnDate:'Voraussichtliche Rückkehr am',contact:'Kontaktieren Sie uns',newsletterSuccess:'Danke! Sie werden benachrichtigt.',newsletterError:'Ein Fehler ist aufgetreten.',emailLabel:'Ihre E-Mail-Adresse',followUs:'Folgen Sie uns',loading:'Laden...' },
+    es: { days:'Días',hours:'Horas',minutes:'Minutos',seconds:'Segundos',returnDate:'Regreso previsto el',contact:'Contáctenos',newsletterSuccess:'¡Gracias! Le notificaremos.',newsletterError:'Ha ocurrido un error.',emailLabel:'Su direccion de correo',followUs:'Síguenos',loading:'Cargando...' },
+    it: { days:'Giorni',hours:'Ore',minutes:'Minuti',seconds:'Secondi',returnDate:'Ritorno previsto il',contact:'Contattaci',newsletterSuccess:'Grazie! Sarai avvisato.',newsletterError:'Si è verificato un errore.',emailLabel:'Il tuo indirizzo email',followUs:'Seguici',loading:'Caricamento...' },
+    pt: { days:'Dias',hours:'Horas',minutes:'Minutos',seconds:'Segundos',returnDate:'Retorno previsto em',contact:'Contacte-nos',newsletterSuccess:'Obrigado! Será notificado.',newsletterError:'Ocorreu um erro.',emailLabel:'O seu endereco de email',followUs:'Siga-nos',loading:'Carregando...' },
+    nl: { days:'Dagen',hours:'Uren',minutes:'Minuten',seconds:'Seconden',returnDate:'Verwachte terugkeer op',contact:'Neem contact op',newsletterSuccess:'Bedankt! U wordt op de hoogte gebracht.',newsletterError:'Er is een fout opgetreden.',emailLabel:'Uw e-mailadres',followUs:'Volg ons',loading:'Laden...' },
+    ja: { days:'日',hours:'時間',minutes:'分',seconds:'秒',returnDate:'復旧予定日',contact:'お問い合わせ',newsletterSuccess:'ありがとうございます！',newsletterError:'エラーが発生しました。',emailLabel:'メールアドレス',followUs:'フォロー',loading:'読み込み中...' },
+    ar: { days:'أيام',hours:'ساعات',minutes:'دقائق',seconds:'ثوانٍ',returnDate:'تاريخ العودة المتوقع',contact:'اتصل بنا',newsletterSuccess:'شكراً لك!',newsletterError:'حدث خطأ.',emailLabel:'بريدك الإلكتروني',followUs:'تابعنا',loading:'جار التحميل...' },
+    zh: { days:'天',hours:'小时',minutes:'分钟',seconds:'秒',returnDate:'预计恢复日期',contact:'联系我们',newsletterSuccess:'谢谢！',newsletterError:'发生错误。',emailLabel:'您的电子邮箱',followUs:'关注我们',loading:'加载中...' }
   };
 
   function t(lang, key) {
@@ -345,7 +351,10 @@ body{font-family:system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background
     if (!data.showNewsletterForm) return '';
     return '<div style="width:100%;display:flex;justify-content:center;margin-bottom:1.5rem">' +
       '<form class="m-newsletter" id="m-nl-form">' +
-      '<input type="email" id="m-nl-email" placeholder="'+esc(data.newsletterPlaceholder || 'votre@email.com')+'" required style="color:'+esc(textColor)+'">' +
+      // A placeholder is not an accessible name: it is not exposed as one and it
+      // vanishes on the first keystroke. This is the only form control the
+      // plugin renders, and it had none.
+      '<input type="email" id="m-nl-email" aria-label="'+esc(t(currentLang,'emailLabel'))+'" placeholder="'+esc(data.newsletterPlaceholder || 'votre@email.com')+'" required style="color:'+esc(textColor)+'">' +
       '<button type="submit" style="background:'+esc(accent)+'">'+esc(data.newsletterButtonLabel || 'Me notifier')+'</button>' +
       '</form></div>';
   }

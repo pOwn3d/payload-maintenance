@@ -60,6 +60,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Nous contacter',
     newsletterSuccess: 'Merci ! Vous serez notifie(e) du retour du site.',
     newsletterError: 'Une erreur est survenue. Veuillez reessayer.',
+    emailLabel: 'Votre adresse email',
     followUs: 'Suivez-nous',
     loading: 'Chargement...',
   },
@@ -69,6 +70,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Contact us',
     newsletterSuccess: 'Thank you! You will be notified when the site is back.',
     newsletterError: 'An error occurred. Please try again.',
+    emailLabel: 'Your email address',
     followUs: 'Follow us',
     loading: 'Loading...',
   },
@@ -78,6 +80,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Kontaktieren Sie uns',
     newsletterSuccess: 'Danke! Sie werden benachrichtigt.',
     newsletterError: 'Ein Fehler ist aufgetreten.',
+    emailLabel: 'Ihre E-Mail-Adresse',
     followUs: 'Folgen Sie uns',
     loading: 'Laden...',
   },
@@ -87,6 +90,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Contactenos',
     newsletterSuccess: 'Gracias! Le notificaremos.',
     newsletterError: 'Ha ocurrido un error.',
+    emailLabel: 'Su direccion de correo',
     followUs: 'Siguenos',
     loading: 'Cargando...',
   },
@@ -96,6 +100,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Contattaci',
     newsletterSuccess: 'Grazie! Sarai avvisato.',
     newsletterError: 'Si e verificato un errore.',
+    emailLabel: 'Il tuo indirizzo email',
     followUs: 'Seguici',
     loading: 'Caricamento...',
   },
@@ -105,6 +110,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Contacte-nos',
     newsletterSuccess: 'Obrigado! Sera notificado.',
     newsletterError: 'Ocorreu um erro.',
+    emailLabel: 'O seu endereco de email',
     followUs: 'Siga-nos',
     loading: 'Carregando...',
   },
@@ -114,6 +120,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'Neem contact op',
     newsletterSuccess: 'Bedankt! U wordt op de hoogte gebracht.',
     newsletterError: 'Er is een fout opgetreden.',
+    emailLabel: 'Uw e-mailadres',
     followUs: 'Volg ons',
     loading: 'Laden...',
   },
@@ -123,6 +130,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'お問い合わせ',
     newsletterSuccess: 'ありがとうございます！',
     newsletterError: 'エラーが発生しました。',
+    emailLabel: 'メールアドレス',
     followUs: 'フォロー',
     loading: '読み込み中...',
   },
@@ -132,6 +140,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: 'اتصل بنا',
     newsletterSuccess: 'شكراً لك!',
     newsletterError: 'حدث خطأ.',
+    emailLabel: 'بريدك الإلكتروني',
     followUs: 'تابعنا',
     loading: 'جار التحميل...',
   },
@@ -141,6 +150,7 @@ const i18n: Record<string, Record<string, string>> = {
     contact: '联系我们',
     newsletterSuccess: '谢谢！',
     newsletterError: '发生错误。',
+    emailLabel: '您的电子邮箱',
     followUs: '关注我们',
     loading: '加载中...',
   },
@@ -405,11 +415,22 @@ function NewsletterForm({ placeholder, buttonLabel, accent, textColor, apiBase, 
       <input
         type="email" value={email} onChange={(e) => setEmail(e.target.value)}
         placeholder={placeholder} required
+        /* The only form control of the whole plugin, and it had no accessible
+           name: the plugin ships no <label> at all, and a placeholder is not a
+           name (it disappears on first keystroke and is not exposed as one).
+           `aria-label` rather than a visible <label> because the design is a
+           single inline field, and the string is already translated. */
+        aria-label={t(lang, 'emailLabel')}
         style={{
           flex: 1, padding: '0.7rem 1rem', borderRadius: '0.5rem',
           border: '1px solid rgba(255,255,255,0.15)',
           background: 'rgba(255,255,255,0.06)', color: textColor,
-          fontSize: '0.9rem', outline: 'none',
+          fontSize: '0.9rem',
+          /* `outline: 'none'` was here. An inline outline of `none` cannot be
+             restored by any :focus rule — inline styles win — and the onFocus
+             below only changes a 1px border colour on a translucent field,
+             which is not a focus indicator. Dropping it restores the browser
+             default, which is conformant. */
           backdropFilter: 'blur(8px)',
           transition: 'border-color 0.2s',
         }}

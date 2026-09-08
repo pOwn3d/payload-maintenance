@@ -24,8 +24,16 @@ vi.mock('@payloadcms/next/templates', () => ({
   DefaultTemplate: () => null,
 }))
 
+/**
+ * The view reaches its client subtree through this shim (it is the only module
+ * re-exported from the package's `./client` build, the one carrying the
+ * "use client" banner). Both members are stubbed: `MaintenanceErrorBoundary`
+ * has to exist, otherwise the JSX element type is `undefined` and the view
+ * throws before it ever reaches the authorization checks below.
+ */
 vi.mock('../views/MaintenanceViewClient.js', () => ({
   MaintenanceViewClient: () => null,
+  MaintenanceErrorBoundary: ({ children }: { children?: unknown }) => children ?? null,
 }))
 
 const { MaintenanceView } = await import('../views/MaintenanceView.js')

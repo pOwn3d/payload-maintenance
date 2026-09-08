@@ -66,10 +66,21 @@ export function createAnalyticsCollection(
         admin: { readOnly: true, date: { pickerAppearance: 'dayAndTime' } },
       },
       {
+        // Declared but never written: no code path in the plugin resolves a
+        // country. Filling it would mean geolocating the caller's IP — one more
+        // personal datum, and most likely a third-party lookup, in the very
+        // collection whose footprint is being reduced. It stays inert on
+        // purpose; dropping the column is a schema change and waits for v1.0.0.
         name: 'country',
         type: 'text',
-        label: { en: 'Country', fr: 'Pays' },
-        admin: { readOnly: true },
+        label: { en: 'Country (unused)', fr: 'Pays (non utilise)' },
+        admin: {
+          readOnly: true,
+          description: {
+            en: 'Never populated — the plugin does no IP geolocation.',
+            fr: 'Jamais renseigne — le plugin ne fait aucune geolocalisation d IP.',
+          },
+        },
       },
     ],
   }

@@ -5,6 +5,7 @@
 import React, { useEffect, useState } from 'react'
 // @ts-ignore — next is a peer dependency
 import { usePathname } from 'next/navigation'
+import { MaintenanceErrorBoundary } from './ErrorBoundary.js'
 
 interface NavItem {
   href: string
@@ -84,7 +85,7 @@ const defaultConfig: PluginConfig = {
   basePath: '/maintenance',
 }
 
-export function MaintenanceNavLink() {
+function MaintenanceNavLinkInner() {
   const pathname = usePathname()
   const lang = useNavLang()
   const t = translations[lang] || translations.en
@@ -195,5 +196,25 @@ export function MaintenanceNavLink() {
         )
       })}
     </div>
+  )
+}
+
+/**
+ * Injected in `afterNavLinks`, so this renders on EVERY page of the admin
+ * panel: an exception here used to be an exception in the whole panel.
+ *
+ * The boundary is INSIDE the module because Payload mounts the component
+ * straight from the import map — the plugin never gets to be its parent and has
+ * no other place to put an ancestor.
+ *
+ * `fallback={null}` on purpose: the degradation must be silent. A red error
+ * panel wedged into the sidebar of every single page would be a worse outcome
+ * than a missing maintenance link.
+ */
+export function MaintenanceNavLink() {
+  return (
+    <MaintenanceErrorBoundary boundaryName="MaintenanceNavLink" fallback={null}>
+      <MaintenanceNavLinkInner />
+    </MaintenanceErrorBoundary>
   )
 }

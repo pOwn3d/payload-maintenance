@@ -4,6 +4,8 @@ import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 import { getEffectiveEnabled, checkScheduleState } from '../utils/schedule.js'
 import { isMaintenanceAdmin, unauthorizedResponse, type AdminAccessOptions } from '../utils/access.js'
 import { resolveClientIP } from '../utils/clientIp.js'
+import { anonymizeIp, type AnalyticsIpMode } from '../utils/anonymizeIp.js'
+import { runRetentionPurge, type RetentionOptions } from '../utils/retention.js'
 
 /**
  * Quote every CSV cell and neutralise spreadsheet formula injection.
@@ -405,6 +407,7 @@ export function createTrackViewHandler(
   analyticsSlug: string = 'maintenance-analytics',
   trustProxy: boolean = true,
   trustedProxyHops: number = 1,
+  analyticsIpMode: AnalyticsIpMode = 'anonymized',
 ): PayloadHandler {
   return async (req) => {
     // Rate limit: 30 requests per minute per IP. `trustProxy` was not forwarded
@@ -423,12 +426,18 @@ export function createTrackViewHandler(
       const userAgent = clampText(req.headers.get('user-agent'), 512)
       const referer = clampText(req.headers.get('referer'), 512)
 
+      // The rate-limit key above keeps the FULL address on purpose; only the
+      // stored copy is reduced. 'none' omits the column entirely rather than
+      // writing an empty string, so a host can prove nothing was collected.
+      const storedIp =
+        analyticsIpMode === 'full' ? ip : analyticsIpMode === 'none' ? null : anonymizeIp(ip)
+
       // Fire-and-forget insert — don't await
       req.payload.create({
         collection: analyticsSlug as any,
         data: {
           path,
-          ip,
+          ...(storedIp === null ? {} : { ip: storedIp }),
           userAgent,
           referer,
           timestamp: new Date().toISOString(),
@@ -528,6 +537,36 @@ export function createAnalyticsHandler(
       })
     } catch (error) {
       return Response.json({ error: 'Failed to fetch analytics' }, { status: 500 })
+    }
+  }
+}
+
+/**
+ * Retention purge (admin only).
+ *
+ * Deletes analytics rows — and subscribers, when `subscribersRetentionDays` is
+ * configured — older than their retention. This is the MANUAL fallback: when
+ * the host runs Payload Jobs, `plugin.ts` registers a task that calls the very
+ * same `runRetentionPurge`, and this endpoint stays available for hosts that do
+ * not (standalone builds, serverless without a scheduler, one-off cleanups).
+ *
+ * Gated exactly like `/toggle` and `/analytics`: the rows it deletes are the
+ * only audience data the site has, so `!!req.user` is not enough.
+ */
+export function createRetentionPurgeHandler(
+  retention: RetentionOptions,
+  adminOptions: AdminAccessOptions = {},
+): PayloadHandler {
+  return async (req) => {
+    if (!(await isMaintenanceAdmin(req, adminOptions))) {
+      return unauthorizedResponse()
+    }
+
+    try {
+      const report = await runRetentionPurge(req.payload, retention)
+      return Response.json({ purged: true, ...report })
+    } catch {
+      return Response.json({ error: 'Retention purge failed' }, { status: 500 })
     }
   }
 }

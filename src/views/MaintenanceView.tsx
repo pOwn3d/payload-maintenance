@@ -4,7 +4,7 @@ import { DefaultTemplate } from '@payloadcms/next/templates'
 import React from 'react'
 // @ts-ignore — next is a peer dependency
 import { redirect } from 'next/navigation'
-import { MaintenanceViewClient } from './MaintenanceViewClient.js'
+import { MaintenanceViewClient, MaintenanceErrorBoundary } from './MaintenanceViewClient.js'
 import { isMaintenanceAdmin, type AdminAccessOptions } from '../utils/access.js'
 
 /**
@@ -70,7 +70,22 @@ export const MaintenanceView = async (
       user={req.user!}
       visibleEntities={visibleEntities}
     >
-      <MaintenanceViewClient />
+      {/*
+        The boundary is a CLIENT component reached through the package's
+        `./client` export, which is the only build output carrying the
+        "use client" banner. Importing `../components/ErrorBoundary.js`
+        directly would inline a class component into the views (RSC) bundle,
+        where class components are not allowed — the same reason
+        MaintenanceViewClient goes through this shim.
+
+        Visible fallback here, unlike the nav link and the dashboard widget:
+        this page has nothing else to show, so silence would look like a blank
+        screen. The panel names the failure and offers a retry that actually
+        remounts the subtree.
+      */}
+      <MaintenanceErrorBoundary boundaryName="MaintenanceView">
+        <MaintenanceViewClient />
+      </MaintenanceErrorBoundary>
     </DefaultTemplate>
   )
 }

@@ -1,6 +1,6 @@
 {
   "name": "@consilioweb/payload-maintenance",
-  "version": "0.8.0",
+  "version": "0.9.0",
   "packageManager": "pnpm@11.25.0",
   "description": "Payload CMS plugin — customizable maintenance mode page with i18n support",
   "type": "module",
@@ -49,8 +49,12 @@
       }
     }
   },
+  "bin": {
+    "maintenance-uninstall": "./scripts/uninstall.mjs"
+  },
   "files": [
     "dist",
+    "scripts",
     "README.md",
     "LICENSE"
   ],

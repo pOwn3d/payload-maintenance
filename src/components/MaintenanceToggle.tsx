@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useCallback, useEffect, useState } from 'react'
+import { MaintenanceErrorBoundary } from './ErrorBoundary.js'
 
 // ─── i18n ───
 const toggleTranslations: Record<string, Record<string, string>> = {
@@ -55,7 +56,7 @@ interface MaintenanceToggleProps {
   basePath?: string
 }
 
-export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
+const MaintenanceToggleInner: React.FC<MaintenanceToggleProps> = ({
   basePath = '/api/maintenance',
 }) => {
   const [enabled, setEnabled] = useState<boolean | null>(null)
@@ -162,3 +163,18 @@ export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = ({
     </div>
   )
 }
+
+/**
+ * Injected in `beforeDashboard`. Smaller blast radius than the nav link — only
+ * the admin home page — but the same reasoning: Payload mounts it from the
+ * import map, so the boundary has to live inside the module.
+ *
+ * `fallback={null}` because the widget is a shortcut, not the feature: the real
+ * switch is at `/admin/maintenance` and on the global. A broken shortcut must
+ * not push an error panel above the dashboard.
+ */
+export const MaintenanceToggle: React.FC<MaintenanceToggleProps> = (props) => (
+  <MaintenanceErrorBoundary boundaryName="MaintenanceToggle" fallback={null}>
+    <MaintenanceToggleInner {...props} />
+  </MaintenanceErrorBoundary>
+)

@@ -1,6 +1,6 @@
 import type { Config, PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { maintenancePlugin } from '../plugin.js'
+import { maintenancePlugin, RETENTION_TASK_SLUG } from '../plugin.js'
 import { timingSafeEqualString, signBypassToken, verifyBypassToken } from '../utils/bypassToken.js'
 
 const baseConfig = (): Config =>
@@ -79,6 +79,111 @@ describe('plugin — câblage de l autorisation vers les collections', () => {
     expect(`${component?.path}#${component?.exportName}`).toBe(
       '@consilioweb/payload-maintenance/views#MaintenanceView',
     )
+  })
+})
+
+const endpointsOf = (config: Config) =>
+  (config.endpoints ?? []).map((e) => `${String(e.method).toUpperCase()} ${e.path}`)
+
+describe('plugin — purge de rétention', () => {
+  it('expose DELETE /analytics/purge, réservé à l administrateur', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const config = (await maintenancePlugin({})(baseConfig())) as Config
+
+    expect(endpointsOf(config)).toContain('DELETE /maintenance/analytics/purge')
+
+    const purge = (config.endpoints ?? []).find(
+      (e) => e.path === '/maintenance/analytics/purge',
+    )
+    const res = await (purge?.handler as (req: unknown) => Promise<Response>)({
+      user: { collection: 'customers' },
+      payload: { config: { admin: { user: 'users' } } },
+    })
+    expect(res.status).toBe(401)
+  })
+
+  it('reste disponible quand les analytics sont désactivées', async () => {
+    // `subscribersRetentionDays` peut être posé sans analytics : sans cet
+    // enregistrement inconditionnel, l option n aurait aucun déclencheur manuel.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const config = (await maintenancePlugin({ enableAnalytics: false })(baseConfig())) as Config
+
+    const paths = endpointsOf(config)
+    expect(paths).toContain('DELETE /maintenance/analytics/purge')
+    expect(paths).not.toContain('POST /maintenance/track')
+  })
+
+  it('n enregistre la tâche Payload Jobs que si l hôte a déjà le système de jobs', async () => {
+    // Ajouter la clé `jobs` nous-mêmes matérialiserait la collection
+    // `payload-jobs` — un changement de schéma — chez des hôtes qui ne l ont
+    // jamais demandée. L endpoint reste la voie de repli.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const sansJobs = (await maintenancePlugin({})(baseConfig())) as Config
+    expect(sansJobs.jobs).toBeUndefined()
+
+    const hôte = { ...baseConfig(), jobs: { tasks: [] } } as unknown as Config
+    const avecJobs = (await maintenancePlugin({})(hôte)) as Config
+    const tasks = (avecJobs.jobs?.tasks ?? []) as { slug?: string; schedule?: unknown[] }[]
+    const purge = tasks.find((t) => t.slug === RETENTION_TASK_SLUG)
+    expect(purge).toBeDefined()
+    expect(purge?.schedule).toHaveLength(1)
+  })
+
+  it('laisse la main à un hôte qui déclare déjà une tâche du même slug', async () => {
+    // Deux tâches de même slug est une erreur de démarrage Payload, et c est la
+    // sienne que son propre code met en file.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const sienne = { slug: RETENTION_TASK_SLUG, handler: () => ({ output: {} }) }
+    const hôte = { ...baseConfig(), jobs: { tasks: [sienne] } } as unknown as Config
+
+    const config = (await maintenancePlugin({})(hôte)) as Config
+    const tasks = (config.jobs?.tasks ?? []) as unknown[]
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0]).toBe(sienne)
+  })
+})
+
+describe('plugin — option authBypass', () => {
+  const authBypassField = (config: Config) => {
+    const global = (config.globals ?? []).find((g) => g.slug === 'maintenance')
+    const stack: unknown[] = [...(global?.fields ?? [])]
+    while (stack.length) {
+      const field = stack.shift() as Record<string, unknown>
+      if (field?.name === 'authBypass') return field
+      for (const key of ['fields', 'tabs']) {
+        const nested = field?.[key]
+        if (Array.isArray(nested)) stack.push(...nested)
+      }
+    }
+    return undefined
+  }
+
+  it('amorce la case à cocher du global, la seule des six options middleware qui soit câblable', async () => {
+    // Avant : l option n avait AUCUN effet, le plugin se contentait d avertir.
+    // Elle alimente maintenant le `defaultValue` de la case que /status publie
+    // et que le middleware honore — sans exposer de secret ni ouvrir de route.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    expect(authBypassField((await maintenancePlugin({})(baseConfig())) as Config)?.defaultValue).toBe(
+      true,
+    )
+    expect(
+      authBypassField((await maintenancePlugin({ authBypass: false })(baseConfig())) as Config)
+        ?.defaultValue,
+    ).toBe(false)
+  })
+
+  it('avertit de la portée réelle plutôt que de prétendre n avoir aucun effet', async () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    await maintenancePlugin({ authBypass: false })(baseConfig())
+
+    const messages = warn.mock.calls.map((c) => String(c[0]))
+    expect(messages.some((m) => m.includes('authBypass') && m.includes('default value'))).toBe(true)
+    // L ancien message, faux depuis que l option est lue.
+    expect(
+      messages.some((m) => m.includes('authBypass') && m.includes('has no effect')),
+    ).toBe(false)
   })
 })
 

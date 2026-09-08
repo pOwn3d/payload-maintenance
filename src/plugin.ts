@@ -33,12 +33,21 @@ import {
   createScheduleCheckHandler,
   createTrackViewHandler,
   createAnalyticsHandler,
+  createRetentionPurgeHandler,
   createUnsubscribeHandler,
   createConfigHandler,
 } from './endpoints/status.js'
+import {
+  runRetentionPurge,
+  DEFAULT_ANALYTICS_RETENTION_DAYS,
+  type RetentionOptions,
+} from './utils/retention.js'
 import { createMaintenancePageHandler } from './endpoints/page.js'
 import { createPresetsListHandler, createApplyPresetHandler } from './endpoints/presets.js'
 import { translations } from './translations/index.js'
+
+/** Slug of the Payload Jobs task registered when the host runs the job system. */
+export const RETENTION_TASK_SLUG = 'maintenance-retention-purge'
 
 export const maintenancePlugin =
   (pluginConfig: MaintenancePluginConfig = {}): Plugin =>
@@ -54,6 +63,17 @@ export const maintenancePlugin =
     const enableScheduling = pluginConfig.enableScheduling !== false
     const enableAnalytics = pluginConfig.enableAnalytics !== false
     const analyticsSlug = pluginConfig.analyticsSlug ?? 'maintenance-analytics'
+    // Anonymised unless the host asks otherwise: the plugin collects on a page
+    // the visitor cannot opt out of, so the safe default has to be the one that
+    // does not need a lawful basis of its own.
+    const analyticsIpMode = pluginConfig.analyticsIpMode ?? 'anonymized'
+    const retentionOptions: RetentionOptions = {
+      analyticsSlug: enableAnalytics ? analyticsSlug : undefined,
+      subscribersSlug: enableSubscribers ? subscribersSlug : undefined,
+      analyticsRetentionDays:
+        pluginConfig.analyticsRetentionDays ?? DEFAULT_ANALYTICS_RETENTION_DAYS,
+      subscribersRetentionDays: pluginConfig.subscribersRetentionDays,
+    }
     const webhookLogsSlug = pluginConfig.webhookLogsSlug ?? 'maintenance-webhook-logs'
     const mediaSlug = pluginConfig.mediaCollectionSlug ?? 'media'
     const excludedPaths = pluginConfig.excludedPaths ?? ['/admin', '/api']
@@ -71,7 +91,6 @@ export const maintenancePlugin =
       ['allowedIPs', pluginConfig.allowedIPs],
       ['bypassSecret', pluginConfig.bypassSecret],
       ['bypassCookieName', pluginConfig.bypassCookieName],
-      ['authBypass', pluginConfig.authBypass],
       ['maintenancePageComponent', pluginConfig.maintenancePageComponent],
     ] as const
     for (const [name, value] of middlewareOnlyOptions) {
@@ -81,6 +100,20 @@ export const maintenancePlugin =
             `Pass it to createMaintenanceMiddleware() in your middleware.ts instead.`,
         )
       }
+    }
+
+    // `authBypass` used to be in the list above. It is the one option of that
+    // family the plugin CAN honour without exposing anything: it now seeds the
+    // default value of the global's `authBypass` checkbox, which /status
+    // publishes and the middleware reads. The warning is kept — downgraded to
+    // the truth — because `defaultValue` never touches an already-saved global.
+    if (pluginConfig.authBypass !== undefined) {
+      console.warn(
+        `[maintenance] Plugin option "authBypass" seeds the default value of the ` +
+          `"authBypass" checkbox on the "${globalSlug}" global. An install whose global has ` +
+          `already been saved keeps its stored value — change it from the admin panel, or ` +
+          `pass authBypass to createMaintenanceMiddleware() to override it for every visitor.`,
+      )
     }
 
     // `usersCollectionSlug` is in the same family, but louder: it is the option
@@ -212,6 +245,7 @@ export const maintenancePlugin =
             analyticsSlug,
             pluginConfig.trustProxy,
             pluginConfig.trustedProxyHops,
+            analyticsIpMode,
           ),
         },
         {
@@ -221,6 +255,16 @@ export const maintenancePlugin =
         },
       )
     }
+
+    // Retention purge — registered even when analytics are off, because
+    // `subscribersRetentionDays` may still be set and this endpoint is the only
+    // manual way to run the sweep. It deletes from each collection according to
+    // its own retention and leaves untouched the ones with none configured.
+    config.endpoints.push({
+      path: `${basePath}/analytics/purge`,
+      method: 'delete' as const,
+      handler: createRetentionPurgeHandler(retentionOptions, adminOptions),
+    })
 
     if (enableScheduling) {
       config.endpoints.push({
@@ -262,6 +306,40 @@ export const maintenancePlugin =
         handler: createApplyPresetHandler(globalSlug, adminOptions),
       },
     )
+
+    // 4b. Register the retention purge as a Payload Jobs task.
+    //
+    // Only when the host already runs the job system (`config.jobs` present):
+    // adding the key ourselves would materialise the `payload-jobs` collection
+    // — a schema change — on installs that never asked for it. Hosts without it
+    // keep `DELETE <basePath>/analytics/purge` as the manual path.
+    //
+    // Deliberately NOT a setInterval: an in-process timer does not survive a
+    // serverless deploy and runs once per instance behind a load balancer, both
+    // of which the plugin already had to fix for its rate-limit counters.
+    if (config.jobs && (retentionOptions.analyticsSlug || retentionOptions.subscribersSlug)) {
+      const purgeTask = {
+        slug: RETENTION_TASK_SLUG,
+        label: 'Maintenance — retention purge',
+        // 03:00 daily. Six fields (second first), the form Payload documents.
+        schedule: [{ cron: '0 0 3 * * *', queue: 'default' }],
+        handler: async ({ req }: { req: { payload: Parameters<typeof runRetentionPurge>[0] } }) => {
+          const output = await runRetentionPurge(req.payload, retentionOptions)
+          return { output }
+        },
+      }
+
+      const existingTasks = Array.isArray(config.jobs.tasks) ? config.jobs.tasks : []
+      // A host that already declares a task under this slug wins: two tasks
+      // with the same slug is a Payload boot error, and theirs is the one their
+      // own code queues.
+      if (!existingTasks.some((task) => task?.slug === RETENTION_TASK_SLUG)) {
+        config.jobs = {
+          ...config.jobs,
+          tasks: [...existingTasks, purgeTask as unknown as (typeof existingTasks)[number]],
+        }
+      }
+    }
 
     // 5. Add admin dashboard view
     if (addDashboardView) {

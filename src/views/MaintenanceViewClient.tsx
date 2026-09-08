@@ -4,4 +4,4 @@
 // tsup keeps '@consilioweb/payload-maintenance/client' external in the views bundle,
 // so Next.js correctly treats this as a client component.
 // @ts-ignore — self-reference via package exports
-export { MaintenanceViewClient } from '@consilioweb/payload-maintenance/client'
+export { MaintenanceViewClient, MaintenanceErrorBoundary } from '@consilioweb/payload-maintenance/client'

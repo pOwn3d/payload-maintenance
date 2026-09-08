@@ -1,6 +1,7 @@
 import type { AdminAccessCheck } from './utils/access.js'
+import type { AnalyticsIpMode } from './utils/anonymizeIp.js'
 
-export type { AdminAccessCheck }
+export type { AdminAccessCheck, AnalyticsIpMode }
 
 export interface MaintenanceMessage {
   language: string
@@ -58,30 +59,44 @@ export interface MaintenancePluginConfig {
   excludedPaths?: string[]
 
   /** IP addresses that bypass maintenance mode.
-   *  @deprecated Not read by the plugin: the IP check runs inside the Next.js
-   *  middleware, which cannot read this config. Pass the list to
-   *  `createMaintenanceMiddleware({ allowedIPs })` instead. Kept for one more
-   *  minor so existing configs keep compiling; it will be removed. */
+   *  @deprecated NOT WIRABLE — kept only so existing configs keep compiling.
+   *  The IP check runs inside the Next.js middleware, which is a separate
+   *  process with no access to this config. Seeding the global's `allowedIPs`
+   *  textarea from here was considered and rejected: that field is itself inert
+   *  (the middleware cannot read the global without exposing the list
+   *  publicly), so it would give the option the appearance of an effect and
+   *  none of the substance. Pass the list to
+   *  `createMaintenanceMiddleware({ allowedIPs })` instead.
+   *  Planned removal: v1.0.0, not before 2027-03-08. */
   allowedIPs?: string[]
 
   /** Secret query param to bypass maintenance (e.g. ?bypass=secret123).
-   *  @deprecated Not read by the plugin: the bypass runs inside the Next.js
-   *  middleware. Pass it to `createMaintenanceMiddleware({ bypassSecret })`. */
+   *  @deprecated NOT WIRABLE — and deliberately so. The bypass is decided by
+   *  the Next.js middleware; the only way to hand it this value from here would
+   *  be to serve the secret over an endpoint, which is the one thing a bypass
+   *  secret must never be. Pass it to
+   *  `createMaintenanceMiddleware({ bypassSecret })`.
+   *  Planned removal: v1.0.0, not before 2027-03-08. */
   bypassSecret?: string
 
   /** Custom component path for the maintenance page (overrides default).
-   *  @deprecated Never implemented. The maintenance page is served by
-   *  `GET /api<basePath>/page`; override it with the middleware option
-   *  `maintenancePagePath`. */
+   *  @deprecated NOT WIRABLE — never implemented, and honouring it now would be
+   *  a new feature (a second rendering path competing with the served page),
+   *  not a fix. The maintenance page is served by `GET /api<basePath>/page`;
+   *  override it with the middleware option `maintenancePagePath`.
+   *  Planned removal: v1.0.0, not before 2027-03-08. */
   maintenancePageComponent?: string
 
   /** Add admin dashboard view (default: true) */
   addDashboardView?: boolean
 
   /** Cookie name for bypass (default: 'maintenance-bypass').
-   *  @deprecated Not read by the plugin: the cookie is set and read by the
-   *  Next.js middleware. Pass it to
-   *  `createMaintenanceMiddleware({ bypassCookieName })`. */
+   *  @deprecated NOT WIRABLE — the cookie is set and read by the Next.js
+   *  middleware, which is constructed with its own options and never reads this
+   *  config. Publishing the name over `GET <basePath>/config` would not help:
+   *  the middleware needs it before it decides whether to call the API at all.
+   *  Pass it to `createMaintenanceMiddleware({ bypassCookieName })`.
+   *  Planned removal: v1.0.0, not before 2027-03-08. */
   bypassCookieName?: string
 
   /** Media collection slug for uploads (default: 'media') */
@@ -103,17 +118,29 @@ export interface MaintenancePluginConfig {
   enableScheduling?: boolean
 
   /** Allow logged-in Payload users to bypass maintenance (default: true).
-   *  @deprecated Not read by the plugin. Use the `authBypass` checkbox on the
-   *  maintenance global (which IS honoured by the middleware), or
-   *  `createMaintenanceMiddleware({ authBypass })`. */
+   *
+   *  No longer dead, and the only one of the six middleware-shaped options that
+   *  could be revived: it now seeds the DEFAULT VALUE of the `authBypass` checkbox
+   *  on the maintenance global, which `GET <basePath>/status` publishes and the
+   *  middleware does honour. No secret is exposed and no new code path is
+   *  introduced — the runtime decision stays where it always was.
+   *
+   *  Scope of the effect: `defaultValue` only applies to a global that has
+   *  never been saved, so an existing install keeps the value stored in its
+   *  database. Changing the behaviour of a live site is still done from the
+   *  checkbox, or with `createMaintenanceMiddleware({ authBypass: false })`
+   *  which overrides it for every visitor. */
   authBypass?: boolean
 
   /** Collection queried by the middleware auth bypass.
-   *  @deprecated Not read by the plugin: the auth bypass runs inside the
-   *  Next.js middleware. Pass it to
+   *  @deprecated NOT WIRABLE — the auth bypass runs inside the Next.js
+   *  middleware, which validates the session cookie against
+   *  `/api/<slug>/me` before any plugin code runs. Pass it to
    *  `createMaintenanceMiddleware({ usersCollectionSlug })`.
-   *  It deliberately does NOT drive the admin authorization gate — use
-   *  `adminCollectionSlug` for that. */
+   *  It deliberately does NOT drive the admin authorization gate — promoting it
+   *  there would lock hosts out of their own global — use `adminCollectionSlug`
+   *  for that.
+   *  Planned removal: v1.0.0, not before 2027-03-08. */
   usersCollectionSlug?: string
 
   /** Collection whose users may administer maintenance mode: toggle it, export
@@ -132,6 +159,40 @@ export interface MaintenancePluginConfig {
 
   /** Slug for the analytics collection (default: 'maintenance-analytics') */
   analyticsSlug?: string
+
+  /** How the caller's address is stored in the analytics collection
+   *  (default: `'anonymized'`).
+   *
+   *  - `'anonymized'` — IPv4 truncated to /24 (`203.0.113.42` -> `203.0.113.0`),
+   *    IPv6 to /48 (`2001:db8:85a3:...` -> `2001:db8:85a3::`). This is what
+   *    brings the collection inside the CNIL audience-measurement exemption, and
+   *    it keeps `uniqueIPs` usable as an order of magnitude.
+   *  - `'full'` — the whole address. You then need a lawful basis of your own
+   *    and, in the EU, most likely consent: the visitor of a maintenance page
+   *    has no alternative screen to go to, so "legitimate interest" is a hard
+   *    argument to make. Choose it only for abuse investigation, and shorten
+   *    `analyticsRetentionDays` accordingly.
+   *  - `'none'` — the `ip` field is not written at all. Paths, referers and user
+   *    agents are still recorded.
+   *
+   *  Only the STORED value is affected: rate limiting and the middleware
+   *  allow-list keep using the full address, which never leaves the process. */
+  analyticsIpMode?: AnalyticsIpMode
+
+  /** Days of analytics kept by the retention purge (default: 395 — 13 months,
+   *  the CNIL ceiling for audience measurement). Set a value >= 1; anything
+   *  else disables the purge for this collection rather than deleting
+   *  everything. Run it with `DELETE <basePath>/analytics/purge`, or let the
+   *  Payload Jobs task registered by the plugin run it daily when the host has
+   *  the job system configured. */
+  analyticsRetentionDays?: number
+
+  /** Days of newsletter subscribers kept by the retention purge (default:
+   *  `undefined` — NO purge). Left off on purpose: a subscriber row is also the
+   *  proof of their consent (`consentAt`, `consentSource`, `ip`), so deleting it
+   *  on a timer weakens the file rather than improving it. Set it when the
+   *  maintenance window is over and the list has served its purpose. */
+  subscribersRetentionDays?: number
 
   /** Slug for the webhook logs collection (default: 'maintenance-webhook-logs') */
   webhookLogsSlug?: string

@@ -699,8 +699,8 @@ export function createMaintenanceGlobal(
                 access: adminOnlyField,
                 admin: {
                   description: {
-                    en: 'Receive an email when maintenance mode changes (uses Payload email adapter)',
-                    fr: 'Recevez un email quand le mode maintenance change (utilise l\'adaptateur email Payload)',
+                    en: 'NOT SENT YET — nothing in the plugin reads this address. Kept so a value already saved here is not lost; use a webhook (above) for a real notification. Removal or implementation is planned for v1.0.0.',
+                    fr: 'PAS ENCORE ENVOYE — rien dans le plugin ne lit cette adresse. Conserve pour ne pas perdre une valeur deja saisie ; utilisez un webhook (ci-dessus) pour une vraie notification. Retrait ou implementation prevus en v1.0.0.',
                   },
                 },
               },
@@ -715,7 +715,11 @@ export function createMaintenanceGlobal(
                 name: 'authBypass',
                 type: 'checkbox',
                 label: { en: 'Bypass for logged-in users', fr: 'Contournement pour utilisateurs connectes' },
-                defaultValue: true,
+                // Seeded by the plugin option of the same name, which was dead
+                // until now. `defaultValue` only applies to a global that has
+                // never been saved, so an existing install keeps its stored
+                // value — see the note logged by plugin.ts.
+                defaultValue: pluginConfig.authBypass !== false,
                 admin: {
                   description: {
                     en: 'Logged-in Payload admin users automatically see the real site',

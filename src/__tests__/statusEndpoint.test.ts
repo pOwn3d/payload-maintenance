@@ -1,6 +1,6 @@
 import type { PayloadRequest } from 'payload'
 import { describe, expect, it, vi } from 'vitest'
-import { createStatusHandler } from '../endpoints/status.js'
+import { createStatusHandler, createTrackViewHandler } from '../endpoints/status.js'
 
 /**
  * The status endpoint is what the middleware and the public maintenance page
@@ -183,5 +183,94 @@ describe('GET /status — limitation de débit', () => {
 
     const other = await handler(makeReq({ global: {}, ip: '198.51.100.43' }))
     expect(other.status).toBe(200)
+  })
+})
+
+// ─────────────────────────────────────────────────────────────────────────────
+// POST /track — adresse IP stockée
+// ─────────────────────────────────────────────────────────────────────────────
+
+/**
+ * Le handler de tracking vit dans le même module que /status, d'où sa présence
+ * ici. Il lui faut deux membres que `makeReq` ci-dessus n'expose pas — `json()`
+ * et `payload.create` — et un compteur d'IP distinct, la limite de débit étant
+ * globale au processus.
+ */
+let trackIpCounter = 0
+const nextTrackIp = () => `192.0.2.${(trackIpCounter++ % 200) + 1}`
+
+interface TrackedRow {
+  collection: string
+  data: Record<string, unknown>
+}
+
+function makeTrackReq(rows: TrackedRow[], ip: string): PayloadRequest {
+  return {
+    headers: new Headers({ 'x-forwarded-for': ip, 'user-agent': 'Mozilla/5.0' }),
+    json: async () => ({ path: '/' }),
+    payload: {
+      create: async (args: TrackedRow) => {
+        rows.push(args)
+        return {}
+      },
+      logger: { error: vi.fn(), info: vi.fn() },
+    },
+  } as unknown as PayloadRequest
+}
+
+/** Exécute /track et rend la ligne insérée (l'insert est fire-and-forget). */
+const track = async (mode: 'anonymized' | 'full' | 'none' | undefined, ip: string) => {
+  const rows: TrackedRow[] = []
+  const handler = createTrackViewHandler('maintenance-analytics', true, 1, mode)
+  await handler(makeTrackReq(rows, ip))
+  await Promise.resolve()
+  return rows[0]
+}
+
+describe('POST /track — mode de stockage de l IP', () => {
+  it('tronque IPv4 au /24 par défaut, sans que le mode soit précisé', async () => {
+    // C'est le cœur du correctif RGPD : l'adresse entière était écrite telle
+    // quelle dans maintenance-analytics, sans consentement, sans purge et sans
+    // moyen pour le visiteur de s'y opposer.
+    const row = await track(undefined, '203.0.113.42')
+    expect(row?.data.ip).toBe('203.0.113.0')
+    expect(row?.data.ip).not.toBe('203.0.113.42')
+  })
+
+  it('tronque IPv6 au /48', async () => {
+    const row = await track('anonymized', '2001:db8:85a3:8d3:1319:8a2e:370:7348')
+    expect(row?.data.ip).toBe('2001:db8:85a3::')
+  })
+
+  it('conserve l adresse entière quand l hôte demande explicitement "full"', async () => {
+    const ip = nextTrackIp()
+    const row = await track('full', ip)
+    expect(row?.data.ip).toBe(ip)
+  })
+
+  it('n écrit aucun champ ip en mode "none", et garde le reste de la ligne', async () => {
+    const row = await track('none', nextTrackIp())
+    expect(row?.data).not.toHaveProperty('ip')
+    expect(row?.data.path).toBe('/')
+    expect(row?.data.userAgent).toBe('Mozilla/5.0')
+  })
+
+  it('ne touche pas à la clé de limitation de débit, qui reste l adresse entière', async () => {
+    // Si la troncature était faite dans `resolveClientIP`, les 256 adresses d'un
+    // /24 partageraient un seul seau : un visiteur en épuiserait la limite pour
+    // tout son voisinage. Deux adresses du MÊME /24 doivent rester distinctes.
+    const rows: TrackedRow[] = []
+    const handler = createTrackViewHandler('maintenance-analytics', true, 1, 'anonymized')
+
+    let last = await handler(makeTrackReq(rows, '198.51.100.10'))
+    for (let i = 1; i < 30; i++) {
+      last = await handler(makeTrackReq(rows, '198.51.100.10'))
+    }
+    expect(last.status).toBe(200)
+    expect((await handler(makeTrackReq(rows, '198.51.100.10'))).status).toBe(429)
+
+    // Même /24, seau distinct.
+    const neighbour = await handler(makeTrackReq(rows, '198.51.100.11'))
+    expect(neighbour.status).toBe(200)
   })
 })

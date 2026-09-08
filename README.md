@@ -27,6 +27,10 @@ Since 0.6.0 the plugin is admin-only and fails closed: the configuration global 
 - [Collections](#collections)
 - [Bypass Maintenance](#bypass-maintenance)
 - [Package Exports](#package-exports)
+- [Upgrading](#upgrading)
+- [Personal data and retention](#personal-data-and-retention)
+- [Database and updates](#database-and-updates)
+- [Uninstall](#uninstall)
 - [Requirements](#requirements)
 - [Support](#support)
 - [License](#license)
@@ -41,14 +45,16 @@ Since 0.6.0 the plugin is admin-only and fails closed: the configuration global 
 - **Audit history** — every activation and deactivation is logged with who triggered it and how long the site was down, plus every webhook that exhausted its retries.
 - **Webhooks** — Slack, Discord or custom JSON, fired on every toggle, with exponential backoff (3 attempts: 1s, 2s, 4s) and a log collection.
 - **Newsletter with GDPR consent** — signup form on the page, `consent: true` required, `consentAt` / `consentSource` stored, unique unsubscribe token, duplicate prevention, admin CSV export.
-- **Page-view analytics** — path, referer, user agent and IP recorded while maintenance is on, with top-paths and top-referers aggregation.
+- **Page-view analytics, anonymised by default** — path, referer, user agent and a truncated IP (/24 or /48) recorded while maintenance is on, with top-paths and top-referers aggregation. `analyticsIpMode` opts into the full address or into no address at all.
+- **Retention purge** — analytics dropped after 13 months by default, on demand through `DELETE /api/maintenance/analytics/purge` and daily through a Payload Jobs task when your app runs the job system. No `setInterval`, so nothing duplicates behind several instances.
+- **Uninstaller** — `npx maintenance-uninstall` deletes the plugin's documents through the Payload Local API (all three adapters, custom slugs honoured) instead of leaving visitor IPs behind with no UI to erase them.
 - **SEO** — HTTP 503 (configurable), `Retry-After` computed from the estimated end date, `X-Robots-Tag: noindex` and `<meta name="robots" content="noindex,nofollow">`.
 - **Admin dashboard** at `/admin/maintenance` — toggle, live preview, subscriber count with CSV export, history timeline, preset gallery. Plus a toggle widget on the main dashboard and a sidebar nav link.
 - **Design customization** — Google Fonts by name, Lottie animation by URL, dark/light/auto mode, custom CSS and HTML, logo, favicon, background image, background video, split image, social links (8 platforms), contact email.
 
 ### Security
 
-- **Admin-only authorization** — the maintenance global and the six admin endpoints require a user of the Payload admin collection (`config.admin.user`), not merely `req.user`. Override with `adminCollectionSlug`, or plug your own RBAC with `adminAccess`.
+- **Admin-only authorization** — the maintenance global and the seven admin endpoints require a user of the Payload admin collection (`config.admin.user`), not merely `req.user`. Override with `adminCollectionSlug`, or plug your own RBAC with `adminAccess`.
 - **The `/admin/maintenance` view is gated too** — Payload deliberately skips its own `canAccessAdmin` redirect for *custom* admin views and delegates the decision to the view, so `/admin/maintenance` enforces it itself: it requires both Payload's `canAccessAdmin` and the same `isMaintenanceAdmin` gate as the endpoints, and redirects to `/admin/unauthorized` otherwise. Without it, a member of any other auth collection of your app (a `customers` account created by public sign-up) reached the admin panel through this route.
 - **Field-level guards** — `webhooks[].url`, `bypassSecret`, `allowedIPs` and `notifyEmail` carry their own `access.read`, so they stay hidden even if a host re-opens the global.
 - **Rate limiting per IP** on the public endpoints: status 60/min, newsletter 5/min, track 30/min, unsubscribe 10/min.
@@ -64,6 +70,7 @@ Since 0.6.0 the plugin is admin-only and fails closed: the configuration global 
 - **Sandboxed custom HTML** — `customHTML` / `customCSS` are rendered inside an `iframe sandbox=""` (opaque origin, scripting disabled), so a stored payload cannot execute on the site's origin.
 - **Admin-only collections** — the four plugin collections (`subscribers`, `history`, `analytics`, `webhook-logs`) answer `read` / `create` / `update` / `delete` only for the admin collection (or your `adminAccess`), never for any authenticated user of another auth collection.
 - **Segment-boundary path matching** — `excludedPaths: ['/admin']` no longer leaves `/administration-des-ventes` online.
+- **Isolated admin components** — the sidebar nav link (rendered on *every* admin page) and the dashboard toggle each sit behind their own error boundary with a silent fallback, so an exception in a maintenance widget cannot take down the whole Payload panel. The `/admin/maintenance` view has one too, with a visible fallback and a retry that actually remounts the subtree.
 
 ## Installation
 
@@ -174,7 +181,9 @@ The plugin then adds:
 
 ## Plugin Options
 
-Everything passed to `maintenancePlugin()`. The deprecated options below still compile and now log a warning at boot: they are middleware concerns and the plugin never reads them.
+Everything passed to `maintenancePlugin()`. The deprecated options below still compile and log a warning at boot: they are middleware concerns and the plugin never reads them. They are **not removed in this release** — dropping them would break the build of every consumer that passes one. Planned removal: **v1.0.0, not before 2027-03-08**.
+
+Each was re-examined rather than assumed dead. Four cannot be wired at all without either publishing a secret (`bypassSecret`) or adding an endpoint the middleware would have to call before it decides anything (`allowedIPs`, `bypassCookieName`, `usersCollectionSlug`); one was never implemented and honouring it now would be a new feature, not a fix (`maintenancePageComponent`). `authBypass` was the exception, and it is wired — see its row below.
 
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
@@ -191,6 +200,9 @@ Everything passed to `maintenancePlugin()`. The deprecated options below still c
 | `historySlug` | `string` | `'maintenance-history'` | Slug of the history collection |
 | `enableAnalytics` | `boolean` | `true` | Add the analytics collection and its endpoints |
 | `analyticsSlug` | `string` | `'maintenance-analytics'` | Slug of the analytics collection |
+| `analyticsIpMode` | `'anonymized' \| 'full' \| 'none'` | `'anonymized'` | How the visitor's IP is **stored**. `anonymized` truncates IPv4 to /24 and IPv6 to /48; `full` keeps the whole address (you then need your own lawful basis); `none` writes no `ip` field at all. Rate limiting always uses the full address, which never leaves the process |
+| `analyticsRetentionDays` | `number` | `395` | Days of analytics kept by the purge — 13 months, the CNIL ceiling for audience measurement. A value below `1` disables the purge instead of deleting everything |
+| `subscribersRetentionDays` | `number` | `undefined` | Days of subscribers kept by the purge. Off by default: a subscriber row is also the proof of their consent |
 | `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug of the webhook logs collection (always added) |
 | `enableScheduling` | `boolean` | `true` | Add scheduled maintenance and the `schedule-check` endpoint |
 | `adminCollectionSlug` | `string` | Payload's admin collection (`config.admin.user`) | Collection whose users may administer maintenance mode: toggle, stats, export, analytics, presets, and read/update the global |
@@ -201,7 +213,7 @@ Everything passed to `maintenancePlugin()`. The deprecated options below still c
 | ~~`allowedIPs`~~ | `string[]` | `[]` | **Deprecated — no effect.** The IP check runs in the Next.js middleware: pass it to `createMaintenanceMiddleware({ allowedIPs })` |
 | ~~`bypassSecret`~~ | `string` | `undefined` | **Deprecated — no effect.** Pass it to `createMaintenanceMiddleware({ bypassSecret })` |
 | ~~`bypassCookieName`~~ | `string` | `'maintenance-bypass'` | **Deprecated — no effect.** The cookie is set and read by the middleware: `createMaintenanceMiddleware({ bypassCookieName })` |
-| ~~`authBypass`~~ | `boolean` | `true` | **Deprecated — no effect.** Use the `authBypass` checkbox on the global (which the middleware does honour), or `createMaintenanceMiddleware({ authBypass })` |
+| `authBypass` | `boolean` | `true` | Seeds the **default value** of the `authBypass` checkbox on the global, which `/status` publishes and the middleware honours. Was a no-op before; it is now the only one of these middleware-shaped options that could be wired without exposing a secret. `defaultValue` applies to a global that has never been saved, so an existing install keeps its stored value — change it in the admin, or override it for everyone with `createMaintenanceMiddleware({ authBypass: false })` |
 | ~~`usersCollectionSlug`~~ | `string` | `undefined` | **Deprecated — no effect.** It only ever configured the middleware auth bypass: `createMaintenanceMiddleware({ usersCollectionSlug })`. It does **not** drive the admin authorization gate — `adminCollectionSlug` does |
 | ~~`maintenancePageComponent`~~ | `string` | `undefined` | **Deprecated — never implemented.** The page is served by `GET /api/maintenance/page`; override it with the middleware option `maintenancePagePath` |
 
@@ -281,6 +293,7 @@ Paths are relative to `endpointBasePath` (default `/maintenance`) under Payload'
 | `GET` | `/api/maintenance/unsubscribe` | Public | Unsubscribe by token (only when `enableSubscribers`) |
 | `POST` | `/api/maintenance/track` | Public | Record a page view (only when `enableAnalytics`) |
 | `GET` | `/api/maintenance/analytics` | Admin | Analytics data (only when `enableAnalytics`) |
+| `DELETE` | `/api/maintenance/analytics/purge` | Admin | Run the retention purge now. Always registered, including when analytics are off, because `subscribersRetentionDays` may still be set |
 | `POST` | `/api/maintenance/schedule-check` | Admin | Apply the scheduled window (only when `enableScheduling`) |
 | `GET` | `/api/maintenance/config` | Public | Slugs and base path, used by the admin nav link and dashboard |
 | `GET` | `/api/maintenance/page` | Public | Standalone HTML maintenance page |
@@ -289,12 +302,14 @@ Paths are relative to `endpointBasePath` (default `/maintenance`) under Payload'
 
 ## Collections
 
+**Admin** below means the same gate as the endpoints: a user of the admin collection (`adminCollectionSlug`, defaulting to `config.admin.user`), or your `adminAccess`. It is *not* "any authenticated user" — a member of another auth collection of your app (a `customers` account) is refused, which is what closed the hole where a customer could read the subscriber emails and IPs over `/api/<slug>`.
+
 | Slug | Role | Read | Create | Update | Delete |
 |------|------|------|--------|--------|--------|
-| `maintenance-subscribers` | Newsletter signups | Authenticated | Authenticated | Authenticated | Authenticated |
-| `maintenance-history` | Audit trail of every toggle | Authenticated | Authenticated | Never | Authenticated |
-| `maintenance-analytics` | Page views during maintenance | Authenticated | Authenticated | Never | Authenticated |
-| `maintenance-webhook-logs` | Webhook delivery attempts | Authenticated | Authenticated | Never | Authenticated |
+| `maintenance-subscribers` | Newsletter signups | Admin | Admin | Admin | Admin |
+| `maintenance-history` | Audit trail of every toggle | Admin | Admin | Never | Admin |
+| `maintenance-analytics` | Page views during maintenance | Admin | Admin | Never | Admin |
+| `maintenance-webhook-logs` | Webhook delivery attempts | Admin | Admin | Never | Admin |
 
 Subscribers, history and analytics are only added when their `enable*` option is left on; webhook logs is always added. The plugin's own writes go through the Local API and are not subject to these rules — a public signup must call `POST /api/maintenance/newsletter`, which enforces the rate limit, the consent check and email validation.
 
@@ -403,6 +418,113 @@ import type { MaintenanceMiddlewareConfig } from '@consilioweb/payload-maintenan
 `isMaintenanceAdmin(req, { adminCollectionSlug, adminAccess })` is exported so you can gate endpoints of your own with the same rule the plugin uses.
 
 `getNowInTimezone` is deprecated since 0.6.0 and kept only because it is part of the published API surface. It reparses a wall-clock string as server-local time, so never compare its result against a Payload date field — schedule comparisons use plain UTC instants. Safe for display formatting only.
+
+## Upgrading
+
+### 0.8.x -> 0.9.0
+
+**No schema change. No migration to generate.** The diff against 0.8.0 touches `access`, `hooks`, `validate`, `admin.description` and `defaultValue` — none of which is a column.
+
+What changes for you:
+
+- **Visitor IPs in `maintenance-analytics` are now truncated before they are written** (IPv4 to /24, IPv6 to /48). Rows already stored keep their full address: the change applies to new writes only. Set `analyticsIpMode: 'full'` to restore the previous behaviour, and read the "Personal data and retention" section below before you do. Rate limiting is unaffected — it always used, and still uses, the full address in memory.
+- **Analytics are purged after 395 days** by `DELETE /api/maintenance/analytics/purge`, and automatically by a Payload Jobs task **only if your config already has a `jobs` key**. Nothing runs on its own otherwise. On a long-lived install this first run may delete a lot: check the count with the endpoint before wiring a schedule, or raise `analyticsRetentionDays`.
+- **`authBypass` stopped being a no-op.** It now seeds the default value of the checkbox on the global. An install whose global has already been saved is unaffected; a fresh install with `authBypass: false` now starts with the checkbox off.
+- **A `maintenance-uninstall` binary ships with the package.** See "Uninstall".
+- The newsletter email field gained an `aria-label` and got its focus indicator back on both renderers.
+
+### 0.6.x -> 0.7.0 -> 0.8.0
+
+**No schema change. No migration to generate.** Verified on the diff of `src/collections` and `src/globals` between v0.6.0 and 0.8.0: only `access`, `hooks` and `admin.description` moved.
+
+Two changes need an action from you.
+
+**1. Webhooks must be `https://`.** An existing `http://` webhook **stops firing**. It is not rejected in the admin panel — the field validation still accepts `http://` on purpose, so that saving the global does not become impossible for an install that already has one — but `fireWebhook` refuses it at send time and records the refusal in `maintenance-webhook-logs` with `status: failed`, `statusCode: 0` and `Refused before sending: ...`.
+
+The consequence is worth stating plainly: **you will see nothing in the admin, only deliveries that stop.** Check it now:
+
+```
+# Any refused delivery, most recent first
+GET /api/maintenance-webhook-logs?where[status][equals]=failed&sort=-timestamp
+```
+
+Then edit each `http://` URL on the maintenance global to `https://`. While you are there, set `allowedWebhookHosts: ['hooks.slack.com', 'discord.com']` — it is the only SSRF control here that does not depend on DNS timing.
+
+**2. Admin-only authorization.** The global and the six admin endpoints now require a user of the Payload admin collection, not merely `req.user`. If your app has other auth-enabled collections and someone relied on that, point `adminCollectionSlug` at the right collection or plug `adminAccess`.
+
+## Personal data and retention
+
+The plugin stores personal data in two of its four collections. This section is written to be copied into your record of processing activities; **you** are the controller, the plugin is the tool.
+
+| Collection | Personal data | Written by | Possible lawful basis | Default retention |
+|------------|---------------|-----------|----------------------|-------------------|
+| `maintenance-analytics` | IP (truncated by default), user agent, referer, path | Every visitor of the maintenance page, automatically | Legitimate interest, **only** while the IP is truncated and the retention is bounded (CNIL audience-measurement exemption). With `analyticsIpMode: 'full'`, consent is the realistic basis | **395 days** (13 months) |
+| `maintenance-subscribers` | Email, IP, user agent, `consentAt`, `consentSource` | The visitor, by submitting the newsletter form with `consent: true` | Consent. The IP and user agent are the *proof* of that consent, which is why they are kept | **None by default** — set `subscribersRetentionDays` |
+| `maintenance-history` | The email of the admin who toggled maintenance | The plugin, on each toggle | Legitimate interest (audit trail) | None |
+| `maintenance-webhook-logs` | Delivery URL, status, up to 2000 bytes of the response | The plugin, on each webhook | Legitimate interest (operations) | None |
+
+Three things to know before you ship:
+
+**`enableAnalytics` is ON by default.** Installing the plugin is enough to start collecting. Turn it off with `enableAnalytics: false` if you do not want it; there is no consent banner on the maintenance page, and adding one would not help — a visitor with no alternative screen cannot give a free consent anyway. Truncation is what makes the collection defensible, not a banner.
+
+**The IP is anonymised by default.** `203.0.113.42` is stored as `203.0.113.0`, `2001:db8:85a3:8d3::1` as `2001:db8:85a3::`. `analyticsIpMode: 'full'` turns that off, and it is a real decision, not a tuning knob: a full IP is personal data that identifies a household, the visitor cannot opt out, and you take on the lawful basis, the information duty and the access/erasure requests that come with it. Choose it for abuse investigation, and shorten `analyticsRetentionDays` when you do.
+
+**Nothing purges itself unless you wire it.** `DELETE /api/maintenance/analytics/purge` runs the sweep on demand. If your Payload config has a `jobs` key, the plugin also registers a `maintenance-retention-purge` task scheduled daily at 03:00 — but Payload only runs scheduled tasks when the host has autorun or a cron calling `/api/payload-jobs/run` configured. Check that yours does; otherwise the endpoint is your only mechanism.
+
+```ts
+// Retention tuned for a short maintenance window
+maintenancePlugin({
+  analyticsIpMode: 'anonymized', // the default
+  analyticsRetentionDays: 90,
+  subscribersRetentionDays: 365, // once the site is back, the list is spent
+})
+```
+
+**Scope.** One Payload instance = one installation. The settings live in a single global; these plugins are not compatible with `@payloadcms/plugin-multi-tenant`, and on a multi-tenant install the maintenance toggle takes **every** tenant offline.
+
+## Database and updates
+
+- This plugin **adds collections and a global to your Payload config**; it does not own your schema. Your app does.
+- Payload does not let a plugin ship migrations: `payload migrate` reads exactly one directory, the host app's (`payload.db.migrationDir`, resolved against your `cwd`). A migration file inside an npm package is never discovered.
+- **In development**, `push` syncs the schema for you — nothing to do after installing.
+- **In production**, run `payload migrate:create` then `payload migrate`. Never `push`: it is skipped as soon as `NODE_ENV=production`, and mixing it with migrations triggers Payload's data-loss warning.
+- Every release of this plugin states in its **Upgrading** section whether it changes the schema. To date, none has since 0.6.0.
+
+## Uninstall
+
+```bash
+npx maintenance-uninstall            # delete the plugin's documents, remove the package
+npx maintenance-uninstall --dry-run  # count what would be deleted, change nothing
+npx maintenance-uninstall --keep-data
+npx maintenance-uninstall --slugs my-subscribers,my-analytics
+```
+
+**Read this before removing the plugin by hand.** Deleting the dependency and the `maintenancePlugin()` call leaves `maintenance-analytics` in your database — IP addresses, user agents and referers, with no retention — and at the same time removes the only interface able to read or erase them. That is the one thing this script exists to prevent.
+
+What it does:
+
+1. Reports every source file referencing the package. It does **not** rewrite them: `maintenancePlugin()` sits inside your `plugins` array with your own options around it, and a regex edit there is how a `payload.config.ts` gets silently corrupted. Remove the call yourself.
+2. Deletes the documents of the four collections through the **Payload Local API** (`payload run`), so it works on SQLite, PostgreSQL and MongoDB and honours your custom slugs. A destructive step only runs when the plugin is actually detected here — a source reference or the dependency in `package.json` — or with `--force-data`.
+3. Removes the package and regenerates the import map.
+
+What it deliberately does **not** do: drop tables. Payload owns the schema, and a plugin dropping tables from under it is how a database drifts from the migration ledger. The script prints the statements for your adapter; run one, then `payload migrate:create` so your migrations match the new config.
+
+```sql
+-- SQLite / PostgreSQL, default slugs
+DROP TABLE IF EXISTS maintenance_subscribers;
+DROP TABLE IF EXISTS maintenance_history;
+DROP TABLE IF EXISTS maintenance_analytics;
+DROP TABLE IF EXISTS maintenance_webhook_logs;
+DROP TABLE IF EXISTS maintenance;   -- the global
+```
+
+```js
+// MongoDB
+db.maintenance_subscribers.drop(); db.maintenance_history.drop();
+db.maintenance_analytics.drop(); db.maintenance_webhook_logs.drop(); db.maintenance.drop();
+```
+
+The `<slug>_id` columns Payload adds to `payload_locked_documents_rels` for each collection stay behind. Payload ignores them, and SQLite cannot drop a column anyway.
 
 ## Requirements
 
