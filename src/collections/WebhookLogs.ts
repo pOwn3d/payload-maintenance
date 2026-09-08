@@ -1,6 +1,10 @@
 import type { CollectionConfig } from 'payload'
+import { isMaintenanceAdmin, type AdminAccessOptions } from '../utils/access.js'
 
-export function createWebhookLogsCollection(slug: string = 'maintenance-webhook-logs'): CollectionConfig {
+export function createWebhookLogsCollection(
+  slug: string = 'maintenance-webhook-logs',
+  adminOptions: AdminAccessOptions = {},
+): CollectionConfig {
   return {
     slug,
     labels: {
@@ -13,14 +17,19 @@ export function createWebhookLogsCollection(slug: string = 'maintenance-webhook-
       defaultColumns: ['webhookUrl', 'webhookType', 'action', 'status', 'timestamp'],
     },
     access: {
-      read: ({ req }) => !!req.user,
+      // `!!req.user` is NOT authorization: Payload populates req.user for a
+      // member of ANY auth collection of the host app. On a site with a
+      // customer area, that let a logged-in customer read this collection over
+      // the auto-generated REST API and delete rows from it — `navHidden` only
+      // hides the nav entry, it does not close /api/<slug>.
+      read: ({ req }) => isMaintenanceAdmin(req, adminOptions),
       // Writes come from the plugin's own endpoints via the Local API
       // (payload.create defaults to overrideAccess: true), so closing this
       // does not break the public newsletter/tracking flows — it only stops
-      // anonymous POST /api/<slug> from forging rows.
-      create: ({ req }) => !!req.user,
+      // anonymous or non-admin POST /api/<slug> from forging rows.
+      create: ({ req }) => isMaintenanceAdmin(req, adminOptions),
       update: () => false,
-      delete: ({ req }) => !!req.user,
+      delete: ({ req }) => isMaintenanceAdmin(req, adminOptions),
     },
     fields: [
       {

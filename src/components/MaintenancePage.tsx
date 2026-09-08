@@ -153,27 +153,48 @@ function t(lang: string, key: string): string {
 // ─── Helpers ───
 
 /**
- * Simple inline HTML sanitizer — strips dangerous tags and attributes.
- * No external dependencies needed (runs client-side in standalone maintenance page).
+ * Escape a value that is interpolated into the custom-HTML template.
+ * Note there is deliberately NO regex "sanitizer" here any more: the previous
+ * one only stripped `on*` handlers preceded by whitespace, so `<svg/onload=…>`
+ * walked straight through it while giving the impression the subject was
+ * handled. Untrusted markup is rendered in a sandboxed iframe instead (see
+ * `buildCustomDocument`), which cannot execute script at all.
  */
-function sanitizeHTML(html: string): string {
-  // Remove dangerous tags and their content
-  let clean = html.replace(/<\s*script\b[^>]*>[\s\S]*?<\s*\/\s*script\s*>/gi, '')
-  clean = clean.replace(/<\s*iframe\b[^>]*>[\s\S]*?<\s*\/\s*iframe\s*>/gi, '')
-  clean = clean.replace(/<\s*object\b[^>]*>[\s\S]*?<\s*\/\s*object\s*>/gi, '')
-  clean = clean.replace(/<\s*embed\b[^>]*\/?>/gi, '')
-  clean = clean.replace(/<\s*form\b[^>]*>[\s\S]*?<\s*\/\s*form\s*>/gi, '')
-  // Remove self-closing / orphan variants
-  clean = clean.replace(/<\s*script\b[^>]*\/?>/gi, '')
-  clean = clean.replace(/<\s*iframe\b[^>]*\/?>/gi, '')
-  clean = clean.replace(/<\s*object\b[^>]*\/?>/gi, '')
-  // Remove on* event handlers (onclick, onerror, onload, etc.)
-  clean = clean.replace(/\s+on\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]*)/gi, '')
-  // Remove javascript: URLs
-  clean = clean.replace(/href\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'href="#"')
-  clean = clean.replace(/src\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'src=""')
-  clean = clean.replace(/action\s*=\s*["']?\s*javascript\s*:[^"'>]*/gi, 'action=""')
-  return clean
+function escapeHTML(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+/** Only http(s) and site-relative URLs may reach an attribute. */
+function safeUrl(raw: string | null | undefined): string {
+  const value = (raw ?? '').trim()
+  if (!value) return ''
+  if (/^\/(?!\/)/.test(value)) return value
+  const lower = value.toLowerCase()
+  if (lower.startsWith('http://') || lower.startsWith('https://')) return value
+  return ''
+}
+
+/**
+ * Full document served to the sandboxed iframe. `sandbox=""` puts it in an
+ * opaque origin with scripting disabled, so a stored payload in `customHTML`
+ * can neither run nor read this page's cookies.
+ */
+export function buildCustomDocument(html: string, css?: string | null): string {
+  const style = css ? `<style>${css.replace(/<\/(?=style)/gi, '<\\/')}</style>` : ''
+  return (
+    '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<meta name="viewport" content="width=device-width,initial-scale=1">' +
+    '<style>html,body{margin:0;padding:0;min-height:100%}</style>' +
+    style +
+    '</head><body>' +
+    html +
+    '</body></html>'
+  )
 }
 
 function detectLanguage(messages: MaintenanceMessage[]): string {
@@ -867,18 +888,21 @@ export const MaintenancePage: React.FC<MaintenancePageProps> = ({
 
   // Custom HTML template
   if (data.template === 'custom' && data.customHTML) {
-    const html = sanitizeHTML(
-      data.customHTML
-        .replace(/\{\{title\}\}/g, message?.title || '')
-        .replace(/\{\{description\}\}/g, message?.description || '')
-        .replace(/\{\{estimatedEnd\}\}/g, data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : '')
-        .replace(/\{\{logoUrl\}\}/g, data.logoUrl || ''),
-    )
+    const html = data.customHTML
+      .replace(/\{\{title\}\}/g, escapeHTML(message?.title || ''))
+      .replace(/\{\{description\}\}/g, escapeHTML(message?.description || ''))
+      .replace(
+        /\{\{estimatedEnd\}\}/g,
+        escapeHTML(data.estimatedEnd ? formatDate(data.estimatedEnd, currentLang) : ''),
+      )
+      .replace(/\{\{logoUrl\}\}/g, escapeHTML(safeUrl(data.logoUrl)))
     return (
-      <>
-        <div dangerouslySetInnerHTML={{ __html: html }} />
-        {data.customCSS && <style>{data.customCSS}</style>}
-      </>
+      <iframe
+        title="Maintenance"
+        sandbox=""
+        srcDoc={buildCustomDocument(html, data.customCSS)}
+        style={{ position: 'fixed', inset: 0, width: '100%', height: '100%', border: 0 }}
+      />
     )
   }
 

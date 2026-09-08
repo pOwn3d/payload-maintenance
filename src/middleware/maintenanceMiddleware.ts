@@ -1,5 +1,12 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { checkScheduleState } from '../utils/schedule.js'
+import { resolveClientIP } from '../utils/clientIp.js'
+import {
+  sha256Hex,
+  signBypassToken,
+  timingSafeEqualString,
+  verifyBypassToken,
+} from '../utils/bypassToken.js'
 
 export interface MaintenanceMiddlewareConfig {
   /** Base URL of the Payload API (default: same origin) */
@@ -45,8 +52,19 @@ export interface MaintenanceMiddlewareConfig {
   allowedIPs?: string[]
 
   /** Trust proxy headers for IP detection (default: true).
-   *  Set to false when not behind a trusted reverse proxy. */
+   *  Set to false when not behind a trusted reverse proxy.
+   *  Note that without a proxy that overwrites `x-forwarded-for`, `allowedIPs`
+   *  is not a security control: the header is client-supplied. */
   trustProxy?: boolean
+
+  /** Number of reverse proxies that append to `x-forwarded-for` (default: 1).
+   *  The client IP is read as `parts[length - trustedProxyHops]`, because a
+   *  conforming proxy APPENDS the peer address: the FIRST element of the header
+   *  is the one the caller sent. Set 2 for CDN + load balancer, and so on. */
+  trustedProxyHops?: number
+
+  /** Lifetime of the bypass cookie in seconds (default: 86400). */
+  bypassCookieMaxAge?: number
 }
 
 interface CachedStatus {
@@ -126,21 +144,131 @@ async function fetchMaintenanceStatus(
 }
 
 /**
- * Validate a Payload auth token by calling /api/users/me.
- * Results are cached for 15 seconds to avoid excessive requests.
+ * Validate a Payload auth token by calling /api/users/me; results are cached
+ * for 15 seconds to avoid excessive requests.
+ *
+ * Two zones, not one. A single Map evicted in insertion order let an anonymous
+ * flood of unknown tokens push out the `valid: true` entries of signed-in
+ * admins — every one of them went back to a `/me` round-trip on every page.
+ * Negative results can only ever evict other negative results.
  */
-const authTokenCache = new Map<string, { valid: boolean; expiresAt: number }>()
+const authPositiveCache = new Map<string, { valid: boolean; expiresAt: number }>()
+const authNegativeCache = new Map<string, { valid: boolean; expiresAt: number }>()
+
+/** Hard cap per zone. Without one, an anonymous visitor presenting a fresh
+ *  random token per request grew this Map for the lifetime of the process:
+ *  expired entries were only ever overwritten if the SAME token came back,
+ *  which never happens with random values. */
+const AUTH_CACHE_MAX_ENTRIES = 500
+
+function evictTo(cache: Map<string, { valid: boolean; expiresAt: number }>, max: number): void {
+  if (cache.size < max) return
+  const now = Date.now()
+  for (const [k, v] of cache) {
+    if (v.expiresAt <= now) cache.delete(k)
+  }
+  // Still full of live entries: evict oldest first (Map keeps insertion order).
+  while (cache.size >= max) {
+    const oldest = cache.keys().next()
+    if (oldest.done) break
+    cache.delete(oldest.value)
+  }
+}
+
+function rememberAuthResult(key: string, valid: boolean, expiresAt: number): void {
+  const cache = valid ? authPositiveCache : authNegativeCache
+  const other = valid ? authNegativeCache : authPositiveCache
+  // A token cannot be in both zones: drop the stale answer when it flips.
+  other.delete(key)
+  evictTo(cache, AUTH_CACHE_MAX_ENTRIES)
+  cache.set(key, { valid, expiresAt })
+}
+
+function readAuthResult(key: string): { valid: boolean; expiresAt: number } | undefined {
+  return authPositiveCache.get(key) ?? authNegativeCache.get(key)
+}
+
+/** Test hook: lets the suite assert that the cache stays bounded. */
+export function __authTokenCacheSize(): number {
+  return authPositiveCache.size + authNegativeCache.size
+}
+
+/** Test hook: positive entries must survive a flood of anonymous tokens. */
+export function __authPositiveCacheSize(): number {
+  return authPositiveCache.size
+}
+
+/** Payload issues a JWT in its auth cookie. Anything that is not shaped like
+ *  one cannot be valid, so it is rejected without the `/me` round-trip that
+ *  turned one anonymous request into two internal ones. */
+const JWT_SHAPE = /^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+$/
+
+/** `atob` is available on both the Edge runtime and Node — `Buffer` is not. */
+function decodeJwtSegment(segment: string): Record<string, unknown> | null {
+  if (!segment || segment.length > 1024) return null
+  try {
+    const base64 = segment.replace(/-/g, '+').replace(/_/g, '/')
+    const padded = base64 + '='.repeat((4 - (base64.length % 4)) % 4)
+    const parsed: unknown = JSON.parse(atob(padded))
+    return parsed && typeof parsed === 'object' && !Array.isArray(parsed)
+      ? (parsed as Record<string, unknown>)
+      : null
+  } catch {
+    return null
+  }
+}
+
+/** Tolerance on `exp`; Payload signs the token in the same deployment, so any
+ *  real skew is tiny, but a hard boundary would evict a token a second early. */
+const JWT_EXP_SKEW_SECONDS = 60
+
+/**
+ * Cheap, network-free pre-check. It is deliberately conservative: it rejects
+ * only what CANNOT be a live Payload session (wrong shape, header that is not
+ * JSON with an `alg`, payload whose `exp` is already past). Anything it cannot
+ * read is still sent to `/me` — Payload, not this filter, decides validity.
+ */
+export function looksLikeAuthToken(token: string, now: number = Date.now()): boolean {
+  if (token.length > 4096 || !JWT_SHAPE.test(token)) return false
+
+  const [header, body] = token.split('.')
+  const decodedHeader = decodeJwtSegment(header!)
+  if (!decodedHeader || typeof decodedHeader.alg !== 'string') return false
+
+  const decodedBody = decodeJwtSegment(body!)
+  if (decodedBody && typeof decodedBody.exp === 'number') {
+    if (decodedBody.exp + JWT_EXP_SKEW_SECONDS < Math.floor(now / 1000)) return false
+  }
+  return true
+}
 
 async function validateAuthToken(
   origin: string,
   token: string,
   usersCollectionSlug: string,
   authCookieName: string,
+  /** '' when no address can be attributed to the caller — see the throttle note. */
+  clientIP: string,
 ): Promise<boolean> {
+  if (!looksLikeAuthToken(token)) return false
+
   const now = Date.now()
-  const cached = authTokenCache.get(`${usersCollectionSlug}:${token}`)
+  // The cache is keyed by a digest, never by the token itself: a middleware
+  // process should not hold a pile of live session JWTs in memory.
+  const cacheKey = `${usersCollectionSlug}:${await sha256Hex(token)}`
+  const cached = readAuthResult(cacheKey)
   if (cached && now < cached.expiresAt) {
     return cached.valid
+  }
+
+  // Every cache miss becomes an internal `/me` call, so one anonymous request
+  // becomes two. Only MISSES THAT TURNED OUT INVALID are counted, and only for
+  // a caller we can actually attribute: an un-attributable bucket would be a
+  // shared one, and a shared bucket is a lever an anonymous visitor can pull to
+  // lock signed-in admins out. An admin already validated in the last 15s never
+  // reaches this line — the positive cache answers first.
+  if (clientIP && !attemptAllowed(`auth:${clientIP}`, AUTH_LOOKUP_FAILURE_MAX, 60_000)) {
+    return false
   }
 
   try {
@@ -156,7 +284,8 @@ async function validateAuthToken(
     if (meRes.ok) {
       const meData = await meRes.json()
       const valid = Boolean(meData?.user)
-      authTokenCache.set(`${usersCollectionSlug}:${token}`, { valid, expiresAt: now + 15_000 })
+      rememberAuthResult(cacheKey, valid, now + 15_000)
+      if (!valid && clientIP) recordFailure(`auth:${clientIP}`, 60_000)
       return valid
     }
   } catch {
@@ -168,8 +297,55 @@ async function validateAuthToken(
   }
   // Reached only when Payload answered with a non-ok status (401/403): that is a
   // real negative and is worth caching.
-  authTokenCache.set(`${usersCollectionSlug}:${token}`, { valid: false, expiresAt: now + 15_000 })
+  rememberAuthResult(cacheKey, false, now + 15_000)
+  if (clientIP) recordFailure(`auth:${clientIP}`, 60_000)
   return false
+}
+
+/**
+ * Failure counters, keyed by caller identity ONLY — never by a shared bucket.
+ *
+ * A global `__all__` counter was added here to slow `?bypass=` brute forcing and
+ * became a denial-of-service switch instead: any anonymous visitor could burn
+ * it and the operator's own correct link was then refused. A bucket an attacker
+ * can fill on someone else's behalf is not a rate limit, it is a lever.
+ *
+ * The window never slides: `resetAt` is fixed on the first failure, so repeated
+ * failures cannot extend a lockout indefinitely.
+ */
+const failureCounters = new Map<string, { count: number; resetAt: number }>()
+const FAILURE_MAX_KEYS = 1000
+
+/** Wrong `?bypass=` values tolerated per caller per minute. */
+const BYPASS_FAILURE_MAX = 10
+/** Unknown auth cookies tolerated per caller per minute before `/me` is skipped. */
+const AUTH_LOOKUP_FAILURE_MAX = 30
+
+function attemptAllowed(key: string, max: number, windowMs: number): boolean {
+  const now = Date.now()
+  const entry = failureCounters.get(key)
+  if (!entry || now > entry.resetAt) return true
+  return entry.count < max
+}
+
+function recordFailure(key: string, windowMs: number): void {
+  const now = Date.now()
+  const entry = failureCounters.get(key)
+  if (!entry || now > entry.resetAt) {
+    if (failureCounters.size >= FAILURE_MAX_KEYS) {
+      for (const [k, v] of failureCounters) {
+        if (now > v.resetAt) failureCounters.delete(k)
+      }
+      while (failureCounters.size >= FAILURE_MAX_KEYS) {
+        const oldest = failureCounters.keys().next()
+        if (oldest.done) break
+        failureCounters.delete(oldest.value)
+      }
+    }
+    failureCounters.set(key, { count: 1, resetAt: now + windowMs })
+    return
+  }
+  entry.count++
 }
 
 /**
@@ -210,6 +386,16 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
   const bypassSecret = config.bypassSecret || null
   const allowedIPs = config.allowedIPs || []
   const trustProxy = config.trustProxy !== false
+  const trustedProxyHops = Math.max(1, Math.floor(config.trustedProxyHops ?? 1))
+  const bypassCookieMaxAge = Math.max(60, Math.floor(config.bypassCookieMaxAge ?? 60 * 60 * 24))
+
+  if (allowedIPs.length > 0 && !trustProxy) {
+    console.warn(
+      '[maintenance] allowedIPs is set but trustProxy is false: this runtime does not expose a ' +
+        'peer address to Next.js middleware, so the allow-list will never match. Put the plugin ' +
+        'behind a proxy that rewrites x-forwarded-for and set trustedProxyHops instead.',
+    )
+  }
 
   return async (request: NextRequest): Promise<NextResponse | null> => {
     const { pathname } = request.nextUrl
@@ -247,6 +433,15 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
 
     if (!status.enabled) return null
 
+    // One resolution of the caller's address for the whole request: the auth
+    // throttle, the `?bypass=` throttle and the allow-list must not disagree on
+    // who the caller is.
+    const clientIP = resolveClientIP(request.headers, {
+      trustProxy,
+      trustedProxyHops,
+      directIp: (request as { ip?: string }).ip,
+    })
+
     // Auth bypass: validate token against Payload /api/users/me with caching
     if (enableAuthBypass && status.authBypass) {
       const authCookie = request.cookies.get(authCookieName)
@@ -256,45 +451,60 @@ export function createMaintenanceMiddleware(config: MaintenanceMiddlewareConfig 
           authCookie.value,
           usersCollectionSlug,
           authCookieName,
+          clientIP,
         )
         if (isValid) return null
       }
     }
 
-    // Check bypass cookie
+    // Check bypass cookie. The value used to be the literal string 'true', so
+    // `curl -H 'Cookie: maintenance-bypass=true'` walked through the whole
+    // maintenance mode — `httpOnly` stops JavaScript from READING the cookie,
+    // never a client from SENDING it. It is now a signed, expiring proof, and
+    // it is only ever honoured when a bypassSecret is configured.
     const bypassCookie = request.cookies.get(bypassCookieName)
-    if (bypassCookie?.value === 'true') return null
+    if (bypassSecret && bypassCookie?.value) {
+      if (await verifyBypassToken(bypassSecret, bypassCookie.value)) return null
+    }
 
     // Check bypass secret in query params (secret is configured server-side, never exposed via API)
     if (bypassSecret) {
       const bypassParam = request.nextUrl.searchParams.get('bypass')
-      if (bypassParam === bypassSecret) {
-        const response = NextResponse.redirect(request.nextUrl.origin + pathname)
-        response.cookies.set(bypassCookieName, 'true', {
-          httpOnly: true,
-          secure: true,
-          sameSite: 'lax',
-          path: '/',
-          maxAge: 60 * 60 * 24, // 24h
-        })
-        return response
+      if (bypassParam) {
+        // Throttle only a caller we can name. The previous version also
+        // consulted a global bucket and fell back to a shared `'unknown'` key,
+        // so any anonymous visitor could exhaust both and the operator's own
+        // valid link was then refused — and counted as one more failure.
+        const throttleKey = clientIP ? `bypass:${clientIP}` : null
+        const throttled =
+          throttleKey !== null && !attemptAllowed(throttleKey, BYPASS_FAILURE_MAX, 60_000)
+        // Constant-time comparison: `===` on a secret leaks it one character at
+        // a time to an attacker who can measure the answer.
+        if (!throttled && timingSafeEqualString(bypassParam, bypassSecret)) {
+          const expiresAt = Date.now() + bypassCookieMaxAge * 1000
+          const response = NextResponse.redirect(request.nextUrl.origin + pathname)
+          response.cookies.set(bypassCookieName, await signBypassToken(bypassSecret, expiresAt), {
+            httpOnly: true,
+            secure: true,
+            sameSite: 'lax',
+            path: '/',
+            maxAge: bypassCookieMaxAge,
+          })
+          return response
+        }
+        // Only a genuinely wrong secret is counted. A throttled attempt is not
+        // re-counted: the window is fixed at the first failure and must not be
+        // extendable by continuing to hammer it.
+        if (!throttled && throttleKey !== null) recordFailure(throttleKey, 60_000)
       }
     }
 
-    // Check allowed IPs (configured server-side, never exposed via API)
-    if (allowedIPs.length > 0) {
-      let clientIP: string
-      if (trustProxy) {
-        clientIP =
-          request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-          request.headers.get('x-real-ip') ||
-          ''
-      } else {
-        clientIP = (request as any).ip || ''
-      }
-      if (clientIP && allowedIPs.includes(clientIP)) {
-        return null
-      }
+    // Check allowed IPs (configured server-side, never exposed via API).
+    // `clientIP` is the entry appended by the trusted proxy, not the first
+    // element of x-forwarded-for: that one is whatever the caller sent, and
+    // reading it let an anonymous visitor claim any whitelisted address.
+    if (allowedIPs.length > 0 && clientIP && allowedIPs.includes(clientIP)) {
+      return null
     }
 
     // Check excluded routes

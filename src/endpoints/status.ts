@@ -3,6 +3,7 @@ import crypto from 'crypto'
 import { rateLimit, rateLimitResponse } from '../utils/rateLimiter.js'
 import { getEffectiveEnabled, checkScheduleState } from '../utils/schedule.js'
 import { isMaintenanceAdmin, unauthorizedResponse, type AdminAccessOptions } from '../utils/access.js'
+import { resolveClientIP } from '../utils/clientIp.js'
 
 /**
  * Quote every CSV cell and neutralise spreadsheet formula injection.
@@ -31,18 +32,49 @@ function resolveMediaUrl(media: any, mediaSlug: string): string | null {
   return media.filename ? `/api/${mediaSlug}/file/${media.filename}` : null
 }
 
-/** Extract client IP from request headers */
-function getClientIP(req: any, trustProxy: boolean = true): string {
-  if (trustProxy) {
-    return (
-      req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
-      req.headers.get('x-real-ip') ||
-      req.ip ||
-      'unknown'
-    )
-  }
-  // When trustProxy is false, only use direct connection IP
-  return req.ip || 'unknown'
+/**
+ * Extract the client IP from request headers.
+ *
+ * Reading `x-forwarded-for.split(',')[0]` handed the caller full control of the
+ * value: a conforming proxy APPENDS the peer address, so the first element is
+ * whatever the client sent. Rotating that header defeated every per-IP rate
+ * limit here and poisoned the `ip` column stored on subscribers and analytics
+ * rows — the very field these collections keep for GDPR traceability.
+ */
+function getClientIP(req: any, trustProxy: boolean = true, trustedProxyHops: number = 1): string {
+  return (
+    resolveClientIP(req.headers, { trustProxy, trustedProxyHops, directIp: req.ip }) || 'unknown'
+  )
+}
+
+/**
+ * Second limiter, not keyed on the caller-supplied IP: even a perfectly
+ * resolved IP can be rotated behind a botnet, and these two endpoints write a
+ * row per call. The per-IP limit stays the primary control; this one caps what
+ * the whole endpoint can insert per minute.
+ */
+const GLOBAL_WRITE_LIMITS = { newsletter: 200, track: 600 } as const
+
+/** Public free-text fields are persisted, so they must be bounded. */
+function clampText(value: unknown, maxLength: number): string {
+  if (typeof value !== 'string') return ''
+  return value.length > maxLength ? value.slice(0, maxLength) : value
+}
+
+/**
+ * `path` is written verbatim into the analytics collection. Anything that is
+ * not a plausible pathname is recorded as '/' rather than stored: the field
+ * accepted 100 KB of attacker-chosen text per anonymous request.
+ */
+export function normalizeTrackedPath(raw: unknown): string {
+  if (typeof raw !== 'string') return '/'
+  const trimmed = raw.trim()
+  if (!trimmed.startsWith('/') || trimmed.startsWith('//')) return '/'
+  if (trimmed.length > 512) return '/'
+  // Control characters would land in the admin list view as-is.
+  // eslint-disable-next-line no-control-regex
+  if (/[\u0000-\u001f\u007f]/.test(trimmed)) return '/'
+  return trimmed
 }
 
 /**
@@ -57,10 +89,11 @@ export function createStatusHandler(
   trustProxy: boolean = true,
   mediaSlug: string = 'media',
   excludedPaths: string[] = ['/admin', '/api'],
+  trustedProxyHops: number = 1,
 ): PayloadHandler {
   return async (req) => {
     // Rate limit: 60 requests per minute per IP
-    const ip = getClientIP(req, trustProxy)
+    const ip = getClientIP(req, trustProxy, trustedProxyHops)
     const { allowed, retryAfter } = rateLimit(`status:${ip}`, 60, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
 
@@ -182,6 +215,12 @@ export function createToggleHandler(
 }
 
 /**
+ * Single acknowledgement for every newsletter outcome — see the enumeration
+ * note below. Clients must not branch on this string.
+ */
+const NEWSLETTER_ACK = 'If this address is valid, you will be notified.'
+
+/**
  * Newsletter signup handler — stores email in subscribers collection.
  * Requires GDPR consent field in request body.
  */
@@ -189,12 +228,18 @@ export function createNewsletterHandler(
   globalSlug: string,
   subscribersSlug: string = 'maintenance-subscribers',
   enableSubscribers: boolean = true,
+  trustProxy: boolean = true,
+  trustedProxyHops: number = 1,
 ): PayloadHandler {
   return async (req) => {
-    // Rate limit: 5 requests per minute per IP
-    const ip = getClientIP(req)
+    // Rate limit: 5 requests per minute per IP. `trustProxy` was not forwarded
+    // here, so a host that had explicitly disabled proxy trust was still rate
+    // limited on a header the caller controls.
+    const ip = getClientIP(req, trustProxy, trustedProxyHops)
     const { allowed, retryAfter } = rateLimit(`newsletter:${ip}`, 5, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
+    const global = rateLimit('newsletter:__all__', GLOBAL_WRITE_LIMITS.newsletter, 60_000)
+    if (!global.allowed) return rateLimitResponse(global.retryAfter)
 
     try {
       const body = await req.json?.() as { email?: string; language?: string; consent?: boolean } | undefined
@@ -202,9 +247,17 @@ export function createNewsletterHandler(
       const language = body?.language
       const consent = body?.consent
 
-      // Validate email format
+      // Validate email format. The length bound comes FIRST and is not
+      // negotiable: `/^[^\s@]+@[^\s@]+\.[^\s@]+$/` is satisfied by two megabytes
+      // of 'a' followed by '@x.fr', and Payload's own `email` validation does
+      // not bound the length either — so an anonymous caller could write rows of
+      // arbitrary size into a collection that has no retention. 254 is the
+      // RFC 5321 maximum for a forward path.
+      // Same 400 body in both cases: a distinct "too long" answer would tell the
+      // caller something about the check, and the message must stay generic
+      // exactly like the signup acknowledgement below.
       const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-      if (!email || !emailRegex.test(email)) {
+      if (typeof email !== 'string' || email.length > 254 || !emailRegex.test(email)) {
         return Response.json({ error: 'Invalid email format' }, { status: 400 })
       }
 
@@ -226,8 +279,11 @@ export function createNewsletterHandler(
           limit: 1,
         })
 
+        // The answer must not tell the caller whether the address was already
+        // known: the two distinct messages turned this public endpoint into an
+        // email-enumeration oracle.
         if (existing.totalDocs > 0) {
-          return Response.json({ success: true, message: 'Already registered' })
+          return Response.json({ success: true, message: NEWSLETTER_ACK })
         }
 
         await req.payload.create({
@@ -237,7 +293,7 @@ export function createNewsletterHandler(
             language: safeLanguage,
             subscribedAt: new Date().toISOString(),
             ip,
-            userAgent: req.headers.get('user-agent') || '',
+            userAgent: clampText(req.headers.get('user-agent'), 512),
             consentAt: new Date().toISOString(),
             consentSource: 'maintenance-page',
             unsubscribeToken: crypto.randomUUID(),
@@ -246,7 +302,7 @@ export function createNewsletterHandler(
       }
 
       req.payload.logger.info(`[maintenance] Newsletter signup: ${email}`)
-      return Response.json({ success: true, message: 'Email registered' })
+      return Response.json({ success: true, message: NEWSLETTER_ACK })
     } catch (error) {
       return Response.json({ error: 'Failed to register email' }, { status: 500 })
     }
@@ -345,19 +401,27 @@ export function createStatsHandler(
 /**
  * Track a page view during maintenance mode (public, fire-and-forget).
  */
-export function createTrackViewHandler(analyticsSlug: string = 'maintenance-analytics'): PayloadHandler {
+export function createTrackViewHandler(
+  analyticsSlug: string = 'maintenance-analytics',
+  trustProxy: boolean = true,
+  trustedProxyHops: number = 1,
+): PayloadHandler {
   return async (req) => {
-    // Rate limit: 30 requests per minute per IP
-    const ip = getClientIP(req)
+    // Rate limit: 30 requests per minute per IP. `trustProxy` was not forwarded
+    // here, so rotating X-Forwarded-For gave an anonymous caller an unlimited
+    // number of buckets — and one analytics row per request.
+    const ip = getClientIP(req, trustProxy, trustedProxyHops)
     const { allowed, retryAfter } = rateLimit(`track:${ip}`, 30, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
+    const global = rateLimit('track:__all__', GLOBAL_WRITE_LIMITS.track, 60_000)
+    if (!global.allowed) return rateLimitResponse(global.retryAfter)
 
     try {
       const body = await req.json?.() as { path?: string } | undefined
-      const path = body?.path || '/'
+      const path = normalizeTrackedPath(body?.path)
 
-      const userAgent = req.headers.get('user-agent') || ''
-      const referer = req.headers.get('referer') || ''
+      const userAgent = clampText(req.headers.get('user-agent'), 512)
+      const referer = clampText(req.headers.get('referer'), 512)
 
       // Fire-and-forget insert — don't await
       req.payload.create({
@@ -532,10 +596,14 @@ export function createScheduleCheckHandler(
 /**
  * Unsubscribe handler — removes subscriber by token (public, GET).
  */
-export function createUnsubscribeHandler(subscribersSlug: string, trustProxy: boolean = true): PayloadHandler {
+export function createUnsubscribeHandler(
+  subscribersSlug: string,
+  trustProxy: boolean = true,
+  trustedProxyHops: number = 1,
+): PayloadHandler {
   return async (req) => {
     // Rate limit: 10 requests per minute per IP to prevent DB enumeration
-    const ip = getClientIP(req, trustProxy)
+    const ip = getClientIP(req, trustProxy, trustedProxyHops)
     const { allowed, retryAfter } = rateLimit(`unsubscribe:${ip}`, 10, 60_000)
     if (!allowed) return rateLimitResponse(retryAfter)
 
