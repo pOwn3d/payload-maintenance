@@ -269,8 +269,18 @@ export const maintenancePlugin =
       if (!config.admin.components) config.admin.components = {}
       if (!config.admin.components.views) config.admin.components.views = {}
 
+      // `serverProps` is how the view receives the admin authorization options:
+      // Payload skips its own `canAccessAdmin` redirect for custom admin views
+      // (`isCustomAdminView`), so MaintenanceView has to run the same gate as
+      // the endpoints — and it has no other way to read the plugin config.
+      // The import-map identity (`path#exportName`) is unchanged, so an already
+      // generated importMap.js keeps resolving without being regenerated.
       ;(config.admin.components.views as Record<string, unknown>).maintenance = {
-        Component: '@consilioweb/payload-maintenance/views#MaintenanceView',
+        Component: {
+          exportName: 'MaintenanceView',
+          path: '@consilioweb/payload-maintenance/views',
+          serverProps: adminOptions,
+        },
         path: '/maintenance',
       }
     }

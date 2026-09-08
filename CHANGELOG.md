@@ -5,6 +5,37 @@ All notable changes to `@consilioweb/payload-maintenance` will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.8.0] - 2026-09-08
+
+_Security release, one flaw deep. 0.7.0 closed the endpoints, the collections and the public page, but left the admin **view** open: Payload deliberately skips its own `canAccessAdmin` redirect for custom admin views and delegates the decision to the component, and this component only checked `req.user` — as it had since 0.1.0. On a site with a second auth-enabled collection (a customer area, a members space), any account in it could open `/admin/maintenance` and land inside the admin panel. Upgrade now if that describes your install. The Payload peer floor also moves to `^3.79.1`, which is a breaking install change._
+
+### Security
+
+- **`/admin/maintenance` was reachable by a member of any auth collection of your app.** `@payloadcms/next` guards the panel with `if (!permissions.canAccessAdmin && !isPublicAdminRoute(...) && !isCustomAdminView(...))`, and `isCustomAdminView()` only compares a URL path against the registered custom views — it tests no visibility or access flag, so matching is enough to skip the redirect and authorization is delegated entirely to the view component. `MaintenanceView` checked `!!req.user` and nothing else, from 0.1.0 through **0.7.0 included** — and Payload populates `req.user` from a single `payload-token` cookie for a member of *any* auth-enabled collection of the host app (customers, members, partners). Such an account is refused everywhere else in `/admin` (`canAccessAdmin === false`), yet walked straight into this route and had Payload's admin layout rendered around it: the panel shell, the navigation built from `visibleEntities`, and the client-side config the admin hands every rendered page. The privileged calls behind the dashboard (`/toggle`, `/stats`, `/presets/apply`) have answered `401` to a non-admin since 0.6.0, so what this exposed is the admin panel itself, not the maintenance switch. The view now requires **both** Payload's own `canAccessAdmin` verdict *and* the same `isMaintenanceAdmin` gate as the endpoints (`adminCollectionSlug`, or your `adminAccess`), and redirects to `<adminRoute>/unauthorized` otherwise. **For you:** if your app has a second auth collection, assume every account in it could open that page, and grep your access logs for `/admin/maintenance`. Then check your *other* custom admin views: this exemption is Payload's behaviour for the whole `admin.components.views` map, not something specific to this plugin, so every custom view you or another plugin registers has to run its own check.
+
+- **The peer range allowed a Payload vulnerable to a pre-authentication account takeover.** `peerDependencies.payload` was `^3.0.0`, which resolves happily to versions affected by [GHSA-hp5w-3hxx-vmwf](https://github.com/payloadcms/payload/security/advisories/GHSA-hp5w-3hxx-vmwf) (pre-auth account takeover) and by an SQL injection. Nothing in this plugin needs an API newer than Payload 3.0 — `^3.79.1` is purely a security floor, and the `@payloadcms/*` packages ship in lockstep with `payload`, so they carry the same one. **For you:** the range never blocked those versions and this release cannot uninstall one for you — read the version actually resolved in your app (`pnpm list payload` / `npm ls payload`) rather than trusting the range, and upgrade Payload itself.
+
+### Breaking
+
+- **The peer floor moves to Payload `^3.79.1`, and Next 14 / React 18 are dropped.** `payload`, `@payloadcms/next`, `@payloadcms/ui` and `@payloadcms/translations` go from `^3.0.0` to `^3.79.1`; `next` from `^14.0.0 || ^15.0.0 || ^16.0.0` to `^15.0.0 || ^16.0.0`; `react` and `react-dom` from `^18.0.0 || ^19.0.0` to `^19.0.0`. Payload `>= 3.79.1` itself requires Next 15+ and React 19, so the previous ranges advertised a combination that could not be installed in the first place. Installing on an older stack now reports an unmet peer dependency — an outright failure under a strict peer setting — instead of resolving in silence. Fix: upgrade Payload, which you want regardless (see Security).
+
+- **`/admin/maintenance` now refuses accounts it used to let in.** Three cases change, all deliberate: a member of any collection other than `config.admin.user` is redirected to `<adminRoute>/unauthorized`; an account *of* the admin collection that the host's own `access.admin` turns down (deactivated account, "no panel" role) is refused there too, where it previously got in; and an `adminAccess` granting maintenance to a collection outside `config.admin.user` still opens the endpoints and the global, but no longer this page — the view also demands `canAccessAdmin`, and Payload refuses that account everywhere else in `/admin` anyway. If you need such a role to reach a maintenance UI in the panel, give it access to the admin panel proper.
+
+### Fixed
+
+- **The redirects ignored a renamed admin route.** The unauthenticated case was hard-coded to `/admin/login`, so a host that set `routes.admin` to `/back-office` sent its visitors to a 404. Both redirects now read `config.routes.admin` and fall back to `/admin`.
+
+### Changed
+
+- The view is registered as `{ path, exportName, serverProps }` instead of the `'@consilioweb/payload-maintenance/views#MaintenanceView'` shorthand — that object is how it receives `adminCollectionSlug` and `adminAccess`, which a custom admin view has no other way to read. **The import-map identity (`path#exportName`) is deliberately unchanged, so an `importMap.js` already generated in your app keeps resolving the view: no regeneration needed.** A test pins that identity.
+- `MaintenanceView` is now an `async` server component, because the authorization gate is awaited. Nothing to do if you only register the plugin; a host importing the view directly must render it as one.
+- The authorization check is `permissions.canAccessAdmin !== false` rather than `=== true`, so the view keeps working should a future Payload version stop populating `permissions` for a custom view — the plugin's own gate still runs in that case.
+- README: the peer table and the requirements table state the `3.79.1` security floor and why it exists, the security section documents the view gate, and the `adminAccess` row spells out that the admin *view* additionally requires `canAccessAdmin`.
+
+### Added
+
+- Tests: 161 vitest tests over 11 files (152 over 10 in 0.7.0). The 9 new ones cover the view gate — a foreign auth collection refused, an admin let through, an unauthenticated visitor sent to login, an admin-collection account with `canAccessAdmin: false` refused, a renamed admin collection followed, a custom `adminAccess` honoured inside the panel and overruled outside it, a renamed admin route respected — plus the plugin wiring that hands the options to the view without moving its import-map identity.
+
 ## [0.7.0] - 2026-09-08
 
 _Security release. Every version up to and including 0.6.0 carries the flaws closed here: an anonymous visitor could walk through maintenance mode with a forged cookie or a forged proxy header, four collections holding subscriber emails, visitor IPs and Slack/Discord webhook URLs answered to any logged-in user of any auth collection, the public maintenance page executed markup written by whoever may edit the global, and the webhook sender was a usable SSRF proxy into the host's network. Upgrading is enough to close them — but read `### Changed`, several of these hardenings are visible from the outside._
@@ -204,6 +235,7 @@ _Maintenance mode becomes admin-only and fails closed: the configuration global 
 - `createMaintenanceMiddleware()` for Next.js middleware integration
 - TypeScript strict mode, full type exports
 
+[0.8.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.5.2...v0.6.0
 [0.5.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.3.1...v0.5.0

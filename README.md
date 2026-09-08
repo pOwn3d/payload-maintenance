@@ -49,6 +49,7 @@ Since 0.6.0 the plugin is admin-only and fails closed: the configuration global 
 ### Security
 
 - **Admin-only authorization** — the maintenance global and the six admin endpoints require a user of the Payload admin collection (`config.admin.user`), not merely `req.user`. Override with `adminCollectionSlug`, or plug your own RBAC with `adminAccess`.
+- **The `/admin/maintenance` view is gated too** — Payload deliberately skips its own `canAccessAdmin` redirect for *custom* admin views and delegates the decision to the view, so `/admin/maintenance` enforces it itself: it requires both Payload's `canAccessAdmin` and the same `isMaintenanceAdmin` gate as the endpoints, and redirects to `/admin/unauthorized` otherwise. Without it, a member of any other auth collection of your app (a `customers` account created by public sign-up) reached the admin panel through this route.
 - **Field-level guards** — `webhooks[].url`, `bypassSecret`, `allowedIPs` and `notifyEmail` carry their own `access.read`, so they stay hidden even if a host re-opens the global.
 - **Rate limiting per IP** on the public endpoints: status 60/min, newsletter 5/min, track 30/min, unsubscribe 10/min.
 - **Fail-closed status** — `GET /status` answers `503` instead of a fabricated `{ enabled: false }` when the global cannot be read, and the middleware keeps the last known state when `/status` fails.
@@ -81,13 +82,22 @@ yarn add @consilioweb/payload-maintenance
 
 | Package | Version | Required |
 |---------|---------|----------|
-| `payload` | `^3.0.0` | **Yes** |
-| `@payloadcms/next` | `^3.0.0` | Optional (admin view) |
-| `@payloadcms/ui` | `^3.0.0` | Optional (admin UI) |
-| `@payloadcms/translations` | `^3.0.0` | Optional (i18n) |
-| `next` | `^14.0.0 \|\| ^15.0.0 \|\| ^16.0.0` | Optional (middleware, admin view) |
-| `react` | `^18.0.0 \|\| ^19.0.0` | Optional (client components) |
-| `react-dom` | `^18.0.0 \|\| ^19.0.0` | Optional (client components) |
+| `payload` | `^3.79.1` | **Yes** |
+| `@payloadcms/next` | `^3.79.1` | Optional (admin view) |
+| `@payloadcms/ui` | `^3.79.1` | Optional (admin UI) |
+| `@payloadcms/translations` | `^3.79.1` | Optional (i18n) |
+| `next` | `^15.0.0 \|\| ^16.0.0` | Optional (middleware, admin view) |
+| `react` | `^19.0.0` | Optional (client components) |
+| `react-dom` | `^19.0.0` | Optional (client components) |
+
+> [!IMPORTANT]
+> **The Payload floor is `3.79.1`, not `3.0.0`.** Payload below `3.79.1` is vulnerable to a
+> pre-authentication account takeover ([GHSA-hp5w-3hxx-vmwf](https://github.com/payloadcms/payload/security/advisories/GHSA-hp5w-3hxx-vmwf))
+> and to an SQL injection. Nothing in this plugin needs an API newer than Payload 3.0 —
+> the floor is a security floor, and the `@payloadcms/*` packages ship in lockstep with
+> `payload`, so they carry the same one. Payload `>= 3.79.1` in turn requires Next.js 15+
+> and React 19, which the ranges above now state instead of pretending to support
+> Next 14 / React 18.
 
 > [!IMPORTANT]
 > **Next.js 16 + Turbopack — known issue.** With Next.js 16 and Turbopack (the default bundler) you may hit a `createContext is not a function` error during `next build`. This is a Payload CMS issue ([#15429](https://github.com/payloadcms/payload/issues/15429), [#14330](https://github.com/payloadcms/payload/discussions/14330)), not specific to this plugin.
@@ -184,7 +194,7 @@ Everything passed to `maintenancePlugin()`. The deprecated options below still c
 | `webhookLogsSlug` | `string` | `'maintenance-webhook-logs'` | Slug of the webhook logs collection (always added) |
 | `enableScheduling` | `boolean` | `true` | Add scheduled maintenance and the `schedule-check` endpoint |
 | `adminCollectionSlug` | `string` | Payload's admin collection (`config.admin.user`) | Collection whose users may administer maintenance mode: toggle, stats, export, analytics, presets, and read/update the global |
-| `adminAccess` | `({ req }) => boolean \| Promise<boolean>` | `undefined` | Custom authorization check for the admin endpoints and the global. Overrides `adminCollectionSlug` — plug your own RBAC here |
+| `adminAccess` | `({ req }) => boolean \| Promise<boolean>` | `undefined` | Custom authorization check for the admin endpoints, the global and the `/admin/maintenance` view. Overrides `adminCollectionSlug` — plug your own RBAC here. Note: the admin **view** additionally requires Payload's own `canAccessAdmin`, so granting maintenance to a collection outside `config.admin.user` opens the endpoints, not that page (Payload refuses that account everywhere else in `/admin` anyway) |
 | `trustProxy` | `boolean` | `true` | Trust `x-forwarded-for` / `x-real-ip` when resolving the client IP. Now forwarded to **every** rate-limited endpoint (`/status`, `/newsletter`, `/track`, `/unsubscribe`). Set `false` when not behind a trusted reverse proxy |
 | `trustedProxyHops` | `number` | `1` | How many reverse proxies append to `x-forwarded-for`. The client IP is read as `parts[length - trustedProxyHops]`, because a conforming proxy **appends** the peer address — the first element of the header is whatever the caller sent. Use `2` for CDN + load balancer |
 | `allowedWebhookHosts` | `string[]` | `undefined` | Allow-list of hostnames the webhook sender may contact (sub-domains match). **Recommended** — it is the only SSRF control that does not depend on DNS timing. Private, loopback, link-local and plaintext `http://` targets are refused regardless of this option |
@@ -399,9 +409,9 @@ import type { MaintenanceMiddlewareConfig } from '@consilioweb/payload-maintenan
 | Requirement | Version |
 |-------------|---------|
 | Node.js | `>=18` |
-| Payload CMS | `^3.0.0` |
-| Next.js | `^14.0.0 \|\| ^15.0.0 \|\| ^16.0.0` |
-| React / React DOM | `^18.0.0 \|\| ^19.0.0` |
+| Payload CMS | `^3.79.1` (security floor — see [Peer Dependencies](#peer-dependencies)) |
+| Next.js | `^15.0.0 \|\| ^16.0.0` |
+| React / React DOM | `^19.0.0` |
 | Database | any Payload-supported adapter (SQLite, PostgreSQL, MongoDB) |
 
 ## Support

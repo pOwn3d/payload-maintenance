@@ -52,6 +52,34 @@ describe('plugin — câblage de l autorisation vers les collections', () => {
       expect(await call(collection.access?.read, { collection: 'users' })).toBe(false)
     }
   })
+
+  it('transmet la garde admin a la vue /admin/maintenance', async () => {
+    // Régression MNT-VIEW-01 : la vue custom est le SEUL point d autorisation de
+    // /admin/maintenance (Payload saute son propre `canAccessAdmin` pour les vues
+    // custom), et elle n a aucun autre moyen de lire la config du plugin.
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const adminAccess = () => true
+    const config = (await maintenancePlugin({
+      adminAccess,
+      adminCollectionSlug: 'staff',
+    })(baseConfig())) as Config
+
+    const view = (config.admin?.components?.views as Record<string, { Component: unknown }>)
+      ?.maintenance
+    const component = view?.Component as {
+      exportName?: string
+      path?: string
+      serverProps?: { adminAccess?: unknown; adminCollectionSlug?: unknown }
+    }
+
+    expect(component?.serverProps?.adminAccess).toBe(adminAccess)
+    expect(component?.serverProps?.adminCollectionSlug).toBe('staff')
+    // L identité dans l import map ne doit pas bouger : un importMap.js déjà
+    // généré chez un consommateur doit continuer à résoudre la vue.
+    expect(`${component?.path}#${component?.exportName}`).toBe(
+      '@consilioweb/payload-maintenance/views#MaintenanceView',
+    )
+  })
 })
 
 describe('bypassToken', () => {
