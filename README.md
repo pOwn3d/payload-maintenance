@@ -542,7 +542,7 @@ The `<slug>_id` columns Payload adds to `payload_locked_documents_rels` for each
 - Changelog: [CHANGELOG.md](CHANGELOG.md)
 - If this plugin saves you time: [buy me a coffee](https://buymeacoffee.com/pown3d)
 
-Made by [ConsilioWEB](https://consilioweb.fr).
+Made by [ConsilioWEB](https://consilioweb.fr/services/developpement-web/payload-cms).
 
 ## License
 
