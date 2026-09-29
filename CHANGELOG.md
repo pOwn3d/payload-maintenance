@@ -5,6 +5,27 @@ All notable changes to `@consilioweb/payload-maintenance` will be documented in 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.9.1] - 2026-09-29
+
+Maintenance release. No change to the plugin's runtime code, options or schema: nothing to migrate.
+
+### Changed
+
+- **The README credit links to the page about Payload CMS development.** It pointed to the root
+  of consilioweb.fr; it now points to https://consilioweb.fr/services/developpement-web/payload-cms,
+  the subject of this package.
+- **The build fails on an unresolved relative import in `dist/`.** `scripts/verify-dist-imports.mjs`
+  runs after tsup and stops the build when a relative import in `dist/` targets a file that was
+  never emitted, the defect that made `payload-admin-ui-pro` 0.5.0–0.7.0 and `payload-support`
+  5.0.0–6.0.0 unbuildable in a host application. This package was not affected; the check keeps it
+  that way.
+
+### Development
+
+- Dependabot opens security updates only; routine version bumps are off.
+- pnpm overrides in `pnpm-workspace.yaml` force the patched versions of transitive toolchain
+  dependencies (sass, vitest and the like). None of them reaches a consumer.
+
 ## [0.9.0] - 2026-09-08
 
 _Quality, accessibility and compliance — **not** a security release. No flaw is closed here, nothing in 0.8.0 becomes unsafe by waiting, and there is no reason to rush this one out. It settles what an audit left open and the angles that audit never looked at: the visitor IPs this plugin writes are truncated before they reach the database and finally have a retention, the components it injects into the admin can no longer take the whole Payload panel down with them, the newsletter field is usable with a screen reader and a keyboard, and uninstalling the plugin now takes its data with it. **No schema change, no migration to generate, and no breaking change** — the API only grows._
@@ -290,6 +311,7 @@ _Maintenance mode becomes admin-only and fails closed: the configuration global 
 - `createMaintenanceMiddleware()` for Next.js middleware integration
 - TypeScript strict mode, full type exports
 
+[0.9.1]: https://github.com/pOwn3d/payload-maintenance/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/pOwn3d/payload-maintenance/compare/v0.6.0...v0.7.0
